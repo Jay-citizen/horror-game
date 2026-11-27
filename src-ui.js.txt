@@ -1,0 +1,675 @@
+import {
+  EVIDENCE_DB,
+  CONTRADICTIONS,
+  CHARACTERS,
+  CUTSCENES,
+  RECONSTRUCTION_STEPS,
+  NIGHT_HINTS,
+  NIGHT_OBJECTIVES,
+  LocationId,
+  ContradictionId
+} from './data.js';
+
+export class UIManager {
+  constructor(game, audio, callbacks) {
+    this.game = game;
+    this.audio = audio;
+    this.callbacks = callbacks;
+    this.isUIOpen = false;
+    this.wasInWorld = false;
+    this.paused = false;
+    this.selectedBoardNode = null;
+    this.toastTimer = null;
+  }
+
+  showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+
+  updateHUD() {
+    const s = this.game.state;
+    const [title, objective] = NIGHT_OBJECTIVES[s.night] || NIGHT_OBJECTIVES[1];
+    document.getElementById('hud-night').textContent = title;
+    document.getElementById('hud-loc').textContent =
+      `Location: ${s.location} | Evidence: ${s.evidence.length}/14 | Contradictions: ${s.links.length}/6`;
+    document.getElementById('hud-lead').textContent = objective;
+  }
+
+  updateCheckpointButton() {
+    const button = document.getElementById('btn-load');
+    if (button) {
+      button.disabled = !this.game.hasSave();
+    }
+  }
+
+  openBlockingUI() {
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+    this.isUIOpen = true;
+  }
+
+  closeBlockingUI(requestRelock = false) {
+    this.isUIOpen = false;
+    this.paused = false;
+    if (requestRelock && this.wasInWorld && this.callbacks.requestPointerLock) {
+      this.callbacks.requestPointerLock();
+    }
+  }
+
+  openModal(title, showTabs) {
+    this.openBlockingUI();
+    const overlay = document.getElementById('overlay');
+    const tabs = document.getElementById('nb-tabs');
+    overlay.classList.add('open');
+    document.getElementById('win-title').textContent = title;
+    tabs.hidden = !showTabs;
+  }
+
+  closeModal(requestRelock = true) {
+    document.getElementById('overlay').classList.remove('open');
+    this.closeBlockingUI(requestRelock);
+  }
+
+  closeDialogue(requestRelock = true) {
+    document.getElementById('dialogue').classList.remove('open');
+    this.closeBlockingUI(requestRelock);
+  }
+
+  closeTopOverlay() {
+    if (document.getElementById('cutscene').classList.contains('open')) {
+      return;
+    }
+    if (document.getElementById('dialogue').classList.contains('open')) {
+      this.closeDialogue(true);
+    } else if (document.getElementById('overlay').classList.contains('open')) {
+      this.closeModal(true);
+    } else if (this.paused) {
+      this.closeModal(true);
+    } else if (document.getElementById('hud').style.display === 'block') {
+      this.openPauseMenu();
+    }
+  }
+
+  inspectEvidence(evId) {
+    this.inspectEvidenceSequence([evId], 0);
+  }
+
+  inspectEvidenceSequence(evIds, startIndex = 0) {
+    const evId = evIds[startIndex];
+    const ev = EVIDENCE_DB[evId];
+    if (!ev) return;
+
+    const isNew = this.game.collectEvidence(evId);
+    if (isNew) {
+      this.audio.clue();
+      this.showToast(`Evidence Logged: ${ev.title}`);
+    } else {
+      this.audio.paper();
+    }
+    this.updateHUD();
+
+    let flipped = false;
+    let zoomed = false;
+
+    this.openModal(`${ev.id}: ${ev.title}`, false);
+    const body = document.getElementById('win-body');
+
+    const renderViewer = () => {
+      body.replaceChildren();
+
+      const meta = document.createElement('div');
+      meta.style.cssText = 'color:var(--cyan);font-size:11.5px;margin-bottom:8px;';
+      meta.textContent = `LOCATION: ${ev.loc} | SOURCE: ${ev.source}`;
+      body.appendChild(meta);
+
+      if (ev.type === 'photo') {
+        const frame = document.createElement('div');
+        frame.className = `photo-frame${zoomed ? ' zoomed' : ''}`;
+
+        const art = document.createElement('div');
+        art.className = 'photo-art';
+        art.textContent = flipped ? ev.backText : ev.frontText;
+
+        const caption = document.createElement('div');
+        caption.style.cssText = 'font-size:11px;font-weight:bold;';
+        caption.textContent = flipped ? '— REVERSE SIDE OF PHOTOGRAPH —' : ev.title;
+
+        frame.append(art, caption);
+        body.appendChild(frame);
+      } else {
+        const sheet = document.createElement('pre');
+        sheet.className = `doc-sheet${zoomed ? ' zoomed' : ''}`;
+        sheet.textContent = ev.detail;
+        body.appendChild(sheet);
+      }
+
+      const controls = document.createElement('div');
+      controls.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;';
+
+      if (ev.type === 'photo') {
+        const flipBtn = document.createElement('button');
+        flipBtn.type = 'button';
+        flipBtn.className = 'btn primary';
+        flipBtn.textContent = `FLIP PHOTO (${flipped ? 'VIEW FRONT' : 'READ BACK'})`;
+        flipBtn.onclick = () => {
+          flipped = !flipped;
+          this.audio.paper();
+          renderViewer();
+        };
+        controls.appendChild(flipBtn);
+      }
+
+      const zoomBtn = document.createElement('button');
+      zoomBtn.type = 'button';
+      zoomBtn.className = 'btn';
+      zoomBtn.textContent = zoomed ? 'RESET ZOOM' : 'ZOOM IN';
+      zoomBtn.onclick = () => {
+        zoomed = !zoomed;
+        renderViewer();
+      };
+      controls.appendChild(zoomBtn);
+
+      if (startIndex < evIds.length - 1) {
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'btn primary';
+        nextBtn.textContent = `NEXT ITEM IN BAG (${startIndex + 2}/${evIds.length})`;
+        nextBtn.onclick = () => this.inspectEvidenceSequence(evIds, startIndex + 1);
+        controls.appendChild(nextBtn);
+      }
+
+      body.appendChild(controls);
+    };
+
+    renderViewer();
+  }
+
+  openDialogue(charId) {
+    const c = CHARACTERS[charId];
+    if (!c) return;
+
+    if (this.game.recordStatement(charId)) {
+      this.audio.clue();
+    }
+
+    this.openBlockingUI();
+    const box = document.getElementById('dialogue');
+    box.classList.add('open');
+
+    const speakerEl = document.getElementById('dlg-speaker');
+    const stateEl = document.getElementById('dlg-state');
+    const lineEl = document.getElementById('dlg-line');
+    const optsEl = document.getElementById('dlg-opts');
+
+    speakerEl.textContent = `${c.name} — ${c.role}`;
+    stateEl.textContent = `ATTITUDE: ${this.game.state.charStates[charId]}`;
+    lineEl.textContent = c.intro;
+
+    const renderOpts = (presenting = false) => {
+      optsEl.replaceChildren();
+
+      if (presenting) {
+        this.game.state.evidence.forEach((evId) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn';
+          btn.textContent = `Present ${evId}: ${EVIDENCE_DB[evId].title}`;
+          btn.onclick = () => {
+            const res = this.game.presentEvidenceToCharacter(charId, evId);
+            lineEl.textContent = res.reply;
+            stateEl.textContent = `ATTITUDE: ${this.game.state.charStates[charId]}`;
+            if (res.unlockedEvidence) {
+              this.audio.clue();
+              this.showToast(`Evidence Received: ${EVIDENCE_DB[res.unlockedEvidence].title}`);
+            }
+            this.updateHUD();
+            if (res.triggerTariqCutscene) {
+              this.closeDialogue(false);
+              this.playCutscene(CUTSCENES.night5.tag, CUTSCENES.night5.slides, () => {
+                this.game.save();
+                this.showToast('Night 5 Truth Revealed');
+                this.updateHUD();
+              });
+              return;
+            }
+            renderOpts(false);
+          };
+          optsEl.appendChild(btn);
+        });
+
+        const backBtn = document.createElement('button');
+        backBtn.type = 'button';
+        backBtn.className = 'btn';
+        backBtn.textContent = 'Back';
+        backBtn.onclick = () => renderOpts(false);
+        optsEl.appendChild(backBtn);
+        return;
+      }
+
+      c.options.forEach((opt) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = opt.isPresent ? 'btn primary' : 'btn';
+        btn.textContent = opt.label;
+        btn.onclick = () => {
+          if (opt.isPresent) {
+            renderOpts(true);
+            return;
+          }
+          lineEl.textContent = opt.reply;
+          if (charId === 'DARIUS' && opt.label.includes('October')) {
+            if (this.game.collectEvidence('EV05')) {
+              this.audio.clue();
+              this.showToast(`Evidence Received: ${EVIDENCE_DB.EV05.title}`);
+            }
+          }
+          this.updateHUD();
+        };
+        optsEl.appendChild(btn);
+      });
+
+      const endBtn = document.createElement('button');
+      endBtn.type = 'button';
+      endBtn.className = 'btn';
+      endBtn.textContent = 'End Conversation';
+      endBtn.onclick = () => this.closeDialogue(true);
+      optsEl.appendChild(endBtn);
+    };
+
+    renderOpts(false);
+  }
+
+  getAllBoardNodes() {
+    const s = this.game.state;
+    const nodes = s.evidence.map((id) => ({ id, label: `${id}: ${EVIDENCE_DB[id].title}` }));
+    s.statements.forEach((stId) => {
+      const ch = Object.values(CHARACTERS).find((c) => c.statementId === stId);
+      if (ch) nodes.push({ id: stId, label: `${stId}: ${ch.statementTitle}` });
+    });
+    return nodes;
+  }
+
+  openCaseBoard() {
+    this.openModal('PRECINCT 4 — DETECTIVE CASE BOARD', false);
+    const body = document.getElementById('win-body');
+
+    const renderBoard = () => {
+      body.replaceChildren();
+      const s = this.game.state;
+      const nodes = this.getAllBoardNodes();
+
+      const intro = document.createElement('p');
+      intro.style.cssText = 'color:var(--muted);margin-bottom:10px;';
+      intro.textContent = 'Select two pinned cards to link them and flag contradictions between statements and physical evidence.';
+      body.appendChild(intro);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'board-wrap';
+
+      const leftCol = document.createElement('div');
+      const leftTitle = document.createElement('h4');
+      leftTitle.style.cssText = 'color:var(--accent);margin-bottom:6px;';
+      leftTitle.textContent = 'PINNED EVIDENCE & STATEMENTS';
+      const pinList = document.createElement('div');
+      pinList.className = 'pin-list';
+
+      nodes.forEach((n) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `pin-item${this.selectedBoardNode === n.id ? ' selected' : ''}`;
+        btn.textContent = n.label;
+        btn.onclick = () => {
+          if (!this.selectedBoardNode) {
+            this.selectedBoardNode = n.id;
+          } else if (this.selectedBoardNode === n.id) {
+            this.selectedBoardNode = null;
+          } else {
+            const res = this.game.tryLinkNodes(this.selectedBoardNode, n.id);
+            if (res.matched && !res.alreadyLinked) {
+              this.audio.clue();
+              this.showToast(`Contradiction Flagged: ${res.contradiction.title}`);
+              this.updateHUD();
+            } else if (res.alreadyLinked) {
+              this.showToast('That contradiction is already pinned on the board.');
+            } else {
+              this.showToast('No direct contradiction between those two items.');
+            }
+            this.selectedBoardNode = null;
+          }
+          renderBoard();
+        };
+        pinList.appendChild(btn);
+      });
+
+      leftCol.append(leftTitle, pinList);
+
+      const rightCol = document.createElement('div');
+      const rightTitle = document.createElement('h4');
+      rightTitle.style.cssText = 'color:var(--cyan);margin-bottom:6px;';
+      rightTitle.textContent = `CONFIRMED CONTRADICTIONS (${s.links.length}/6)`;
+      rightCol.appendChild(rightTitle);
+
+      if (s.links.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'color:var(--muted);font-size:12px;';
+        empty.textContent = 'No contradictions linked yet.';
+        rightCol.appendChild(empty);
+      } else {
+        s.links.forEach((cid) => {
+          const c = CONTRADICTIONS.find((x) => x.id === cid);
+          const badge = document.createElement('div');
+          badge.className = 'link-badge';
+          const strong = document.createElement('strong');
+          strong.textContent = c.title;
+          const desc = document.createElement('div');
+          desc.textContent = c.desc;
+          badge.append(strong, desc);
+          rightCol.appendChild(badge);
+        });
+      }
+
+      if (
+        s.night >= 5 &&
+        s.links.includes(ContradictionId.depotAccess) &&
+        s.links.includes(ContradictionId.meetingMotive)
+      ) {
+        const reconTitle = document.createElement('h4');
+        reconTitle.style.cssText = 'color:var(--accent);margin:14px 0 6px;';
+        reconTitle.textContent = 'FINAL NIGHT TIMELINE RECONSTRUCTION';
+        rightCol.appendChild(reconTitle);
+
+        const selects = [];
+        RECONSTRUCTION_STEPS.forEach((_, idx) => {
+          const row = document.createElement('div');
+          row.className = 'recon-row';
+
+          const num = document.createElement('span');
+          num.style.cssText = 'width:24px;color:var(--accent);';
+          num.textContent = `${idx + 1}.`;
+
+          const sel = document.createElement('select');
+          sel.setAttribute('aria-label', `Timeline step ${idx + 1}`);
+          const defOpt = document.createElement('option');
+          defOpt.value = '-1';
+          defOpt.textContent = '-- Select Event --';
+          sel.appendChild(defOpt);
+
+          RECONSTRUCTION_STEPS.forEach((stepText, si) => {
+            const opt = document.createElement('option');
+            opt.value = String(si);
+            opt.textContent = stepText;
+            if (s.night5Reconstructed && si === idx) opt.selected = true;
+            sel.appendChild(opt);
+          });
+
+          selects.push(sel);
+          row.append(num, sel);
+          rightCol.appendChild(row);
+        });
+
+        const verifyBtn = document.createElement('button');
+        verifyBtn.type = 'button';
+        verifyBtn.className = 'btn primary';
+        verifyBtn.style.marginTop = '8px';
+        verifyBtn.textContent = 'VERIFY RECONSTRUCTION & COMPILE REPORT';
+        verifyBtn.onclick = () => {
+          const chosen = selects.map((el) => Number(el.value));
+          if (this.game.verifyReconstruction(chosen)) {
+            this.audio.clue();
+            this.showToast('Timeline Verified! Burial site deduced: Lot 14 Orchard Tool Shed.');
+            this.updateHUD();
+            renderBoard();
+          } else {
+            this.showToast('Sequence mismatch. Check timestamps from EV01, ST_SALMAH, EV07, EV11 & EV12.');
+          }
+        };
+        rightCol.appendChild(verifyBtn);
+      }
+
+      wrap.append(leftCol, rightCol);
+      body.appendChild(wrap);
+    };
+
+    renderBoard();
+  }
+
+  openNotebook(initialTab = 'evidence') {
+    this.openModal('DETECTIVE NORIAH LIM — CASE NOTEBOOK', true);
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach((t) => {
+      const isSelected = t.dataset.t === initialTab;
+      t.classList.toggle('active', isSelected);
+      t.setAttribute('aria-selected', String(isSelected));
+      t.onclick = () => this.openNotebook(t.dataset.t);
+    });
+
+    const body = document.getElementById('win-body');
+    body.replaceChildren();
+    const s = this.game.state;
+
+    if (initialTab === 'evidence') {
+      if (s.evidence.length === 0) {
+        const empty = document.createElement('p');
+        empty.style.color = 'var(--muted)';
+        empty.textContent = 'No evidence collected yet. Search the desk, cabinets, and corkboard.';
+        body.appendChild(empty);
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = 'ev-grid';
+      s.evidence.forEach((id) => {
+        const e = EVIDENCE_DB[id];
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const h4 = document.createElement('h4');
+        h4.textContent = `${e.id}: ${e.title}`;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `Night ${e.night} | ${e.loc}`;
+        const p = document.createElement('p');
+        p.textContent = e.summary;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.style.marginTop = '8px';
+        btn.textContent = 'OPEN VIEWER';
+        btn.onclick = () => this.inspectEvidence(e.id);
+
+        card.append(h4, meta, p, btn);
+        grid.appendChild(card);
+      });
+      body.appendChild(grid);
+    } else if (initialTab === 'statements') {
+      if (s.statements.length === 0) {
+        const empty = document.createElement('p');
+        empty.style.color = 'var(--muted)';
+        empty.textContent = 'No witness statements recorded yet.';
+        body.appendChild(empty);
+        return;
+      }
+      s.statements.forEach((stId) => {
+        const ch = Object.values(CHARACTERS).find((c) => c.statementId === stId);
+        if (!ch) return;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '9px';
+
+        const h4 = document.createElement('h4');
+        h4.textContent = `${ch.name} (${s.charStates[ch.id]})`;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = ch.role;
+        const p = document.createElement('p');
+        p.textContent = ch.statementText;
+
+        card.append(h4, meta, p);
+        body.appendChild(card);
+      });
+    } else if (initialTab === 'timeline') {
+      const entries = [
+        ['09 Nov 2016', 'Hit-and-run on Jalan Lama Sungai kills cyclist Encik Roslan. Osman Timber pickup repaired secretly (EV10, EV13).'],
+        ['11–13 Oct 2023', 'Sakanigadih accesses Lot 9 Depot (EV08, EV09) and preps debate records with Tariq Zulkifli (EV05, EV11).'],
+        ['14 Oct 2023 (Night of Disappearance)', '19:00 false departure claim (EV01) vs 20:35 seen at window (ST_SALMAH) vs 21:05 Hafiz pickup on orchard lane (EV07) vs 21:30 Lot 14 meeting (EV11).'],
+        ['15 Oct 2023', '06:15 Concrete pour at Lot 14 Orchard Tool Shed (EV12); 08:10 parents file runaway report (EV01).']
+      ];
+      entries.forEach(([date, text]) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '8px';
+        const h4 = document.createElement('h4');
+        h4.textContent = date;
+        const p = document.createElement('p');
+        p.textContent = text;
+        card.append(h4, p);
+        body.appendChild(card);
+      });
+    } else if (initialTab === 'map') {
+      const intro = document.createElement('p');
+      intro.style.cssText = 'margin-bottom:10px;color:var(--muted);';
+      intro.textContent = 'Travel to unlocked investigation sites or conclude the current night once all leads are complete.';
+      body.appendChild(intro);
+
+      const locations = [
+        { id: LocationId.office, name: 'Precinct 4 Cold Case Office', unlocked: true },
+        { id: LocationId.residential, name: 'Osman Residence & Neighbourhood (Lots 11–16)', unlocked: s.night >= 2 },
+        { id: LocationId.depotExt, name: 'Lot 9 Storage Depot Exterior', unlocked: s.night >= 2 },
+        { id: LocationId.lot9, name: 'Lot 9 Abandoned Storage Interior', unlocked: s.night >= 4 },
+        { id: LocationId.university, name: 'University Press Archive (Tariq Zulkifli)', unlocked: s.night >= 5 },
+        { id: LocationId.lot14, name: 'Lot 14 Private Orchard Tool Shed', unlocked: s.night >= 6 }
+      ];
+
+      locations.forEach((loc) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.cssText = 'margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;';
+
+        const info = document.createElement('div');
+        const h4 = document.createElement('h4');
+        h4.textContent = loc.name;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = loc.unlocked ? 'ACCESSIBLE' : 'LOCKED — ADVANCE INVESTIGATION';
+        info.append(h4, meta);
+
+        const travelBtn = document.createElement('button');
+        travelBtn.type = 'button';
+        travelBtn.className = `btn${loc.unlocked ? ' primary' : ''}`;
+        travelBtn.disabled = !loc.unlocked;
+        travelBtn.textContent = 'TRAVEL';
+        travelBtn.onclick = () => {
+          this.closeModal(true);
+          this.callbacks.travel(loc.id);
+        };
+
+        card.append(info, travelBtn);
+        body.appendChild(card);
+      });
+
+      if (s.night < 6) {
+        const endWrap = document.createElement('div');
+        endWrap.style.marginTop = '14px';
+        const endBtn = document.createElement('button');
+        endBtn.type = 'button';
+        endBtn.className = 'btn primary';
+        endBtn.textContent = `END NIGHT ${s.night} & SAVE CHECKPOINT`;
+        endBtn.onclick = () => this.callbacks.advanceNight();
+        endWrap.appendChild(endBtn);
+        body.appendChild(endWrap);
+      }
+    } else if (initialTab === 'hints') {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const h4 = document.createElement('h4');
+      h4.textContent = `NIGHT ${s.night} DETECTIVE HINT`;
+      const p = document.createElement('p');
+      p.textContent = NIGHT_HINTS[s.night];
+      card.append(h4, p);
+      body.appendChild(card);
+    }
+  }
+
+  openPauseMenu() {
+    this.paused = true;
+    this.openModal('PAUSED — PRECINCT 4 FIELD LOG', false);
+    const body = document.getElementById('win-body');
+    body.replaceChildren();
+
+    const s = this.game.state;
+    const summary = document.createElement('p');
+    summary.style.marginBottom = '14px';
+    summary.textContent = `Night ${s.night} | Evidence Collected: ${s.evidence.length}/14 | Contradictions Solved: ${s.links.length}/6`;
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
+
+    const resumeBtn = document.createElement('button');
+    resumeBtn.type = 'button';
+    resumeBtn.className = 'btn primary';
+    resumeBtn.textContent = 'RESUME';
+    resumeBtn.onclick = () => this.closeModal(true);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn';
+    saveBtn.textContent = 'SAVE CHECKPOINT';
+    saveBtn.onclick = () => {
+      if (this.game.save()) {
+        this.updateCheckpointButton();
+        this.showToast('Manual Checkpoint Saved');
+      }
+    };
+
+    const titleBtn = document.createElement('button');
+    titleBtn.type = 'button';
+    titleBtn.className = 'btn';
+    titleBtn.textContent = 'MAIN MENU';
+    titleBtn.onclick = () => {
+      this.closeModal(false);
+      this.wasInWorld = false;
+      this.updateCheckpointButton();
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('title-screen').style.display = 'flex';
+    };
+
+    row.append(resumeBtn, saveBtn, titleBtn);
+    body.append(summary, row);
+  }
+
+  playCutscene(tag, slides, onDone) {
+    let idx = 0;
+    this.openBlockingUI();
+    const cs = document.getElementById('cutscene');
+    const tagEl = document.getElementById('cine-tag');
+    const bodyEl = document.getElementById('cine-body');
+    const nextBtn = document.getElementById('cine-next');
+    const skipBtn = document.getElementById('cine-skip');
+
+    cs.classList.add('open');
+
+    const finish = () => {
+      cs.classList.remove('open');
+      this.closeBlockingUI(false);
+      if (onDone) onDone();
+    };
+
+    const renderSlide = () => {
+      tagEl.textContent = tag;
+      bodyEl.textContent = slides[idx];
+      nextBtn.textContent = idx < slides.length - 1 ? 'NEXT' : 'CONTINUE';
+    };
+
+    renderSlide();
+    nextBtn.onclick = () => {
+      idx += 1;
+      if (idx < slides.length) renderSlide();
+      else finish();
+    };
+    skipBtn.onclick = finish;
+  }
+}

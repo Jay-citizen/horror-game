@@ -1,0 +1,105 @@
+import { GameController, SAVE_KEY } from '../src/game.js';
+import { EvidenceId, CharId, ContradictionId, LocationId } from '../src/data.js';
+
+function createMemoryStorage() {
+  const store = new Map();
+  return {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k)
+  };
+}
+
+export function runUnitTests() {
+  const results = [];
+  const assert = (name, cond) => results.push({ name, pass: Boolean(cond) });
+
+  // 1. Evidence collection without duplicates
+  {
+    const g = new GameController(createMemoryStorage());
+    const first = g.collectEvidence(EvidenceId.missingReport);
+    const second = g.collectEvidence(EvidenceId.missingReport);
+    assert(
+      'Evidence collection prevents duplicate entries',
+      first === true && second === false && g.state.evidence.length === 1
+    );
+  }
+
+  // 2. State restoration & nested normalization
+  {
+    const storage = createMemoryStorage();
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        night: 2,
+        location: LocationId.residential,
+        evidence: [EvidenceId.missingReport, 'INVALID_ID'],
+        charStates: { TEOH: 'COOPERATIVE' },
+        flags: { customFlag: true }
+      })
+    );
+    const g = new GameController(storage);
+    const loaded = g.load();
+    assert(
+      'Save restoration normalizes nested objects and filters invalid IDs',
+      loaded &&
+        g.state.night === 2 &&
+        g.state.evidence.length === 1 &&
+        g.state.charStates.TEOH === 'COOPERATIVE' &&
+        g.state.charStates.PARENTS === 'REFUSING' &&
+        g.state.flags.customFlag === true
+    );
+  }
+
+  // 3. Corrupted save recovery
+  {
+    const storage = createMemoryStorage();
+    storage.setItem(SAVE_KEY, '{corrupted_json');
+    const g = new GameController(storage);
+    const loaded = g.load();
+    assert(
+      'Corrupted JSON save safely resets and removes bad storage entry',
+      loaded === false && storage.getItem(SAVE_KEY) === null
+    );
+  }
+
+  // 4. Contradiction linking & Night 1 -> Night 2 progression gate
+  {
+    const g = new GameController(createMemoryStorage());
+    assert('Night 1 gate blocks early advance', g.canAdvanceNight() === false);
+    [EvidenceId.missingReport, EvidenceId.newspaper, EvidenceId.officialPhoto, EvidenceId.officialTimeline]
+      .forEach((id) => g.collectEvidence(id));
+    assert('Night 1 gate unlocks after all 4 office clues', g.canAdvanceNight() === true && g.advanceNight());
+    assert('Night advances cleanly to Night 2', g.state.night === 2);
+  }
+
+  // 5. Character attitude transitions & evidence unlocking
+  {
+    const g = new GameController(createMemoryStorage());
+    g.collectEvidence(EvidenceId.missingReport);
+    const res = g.presentEvidenceToCharacter(CharId.teoh, EvidenceId.missingReport);
+    assert(
+      'Presenting EV01 transitions Mr. Teoh to COOPERATIVE and grants EV07',
+      g.state.charStates.TEOH === 'COOPERATIVE' &&
+        res.unlockedEvidence === EvidenceId.junctionLog &&
+        g.state.evidence.includes(EvidenceId.junctionLog)
+    );
+  }
+
+  // 6. Contradiction validation & Night 5 reconstruction
+  {
+    const g = new GameController(createMemoryStorage());
+    const badLink = g.tryLinkNodes(EvidenceId.missingReport, EvidenceId.newspaper);
+    const goodLink = g.tryLinkNodes(EvidenceId.officialTimeline, EvidenceId.polaroid);
+    const reconOk = g.verifyReconstruction([0, 1, 2, 3, 4, 5, 6, 7]);
+    assert(
+      'Contradiction linking and 8-step timeline verification work accurately',
+      badLink.matched === false &&
+        goodLink.matched === true &&
+        goodLink.contradiction.id === ContradictionId.photoDate &&
+        reconOk === true
+    );
+  }
+
+  return results;
+}

@@ -1,0 +1,236 @@
+import {
+  EVIDENCE_DB,
+  CONTRADICTIONS,
+  CHARACTERS,
+  EvidenceId,
+  LocationId,
+  CharId,
+  ContradictionId
+} from './data.js';
+
+export const SAVE_KEY = 'sakanigadih_save_v1';
+
+export function DEFAULT_STATE() {
+  return {
+    night: 1,
+    location: LocationId.office,
+    evidence: [],
+    examined: [],
+    statements: [],
+    charStates: {
+      [CharId.parents]: CHARACTERS.PARENTS.initialState,
+      [CharId.salmah]: CHARACTERS.SALMAH.initialState,
+      [CharId.teoh]: CHARACTERS.TEOH.initialState,
+      [CharId.aina]: CHARACTERS.AINA.initialState,
+      [CharId.darius]: CHARACTERS.DARIUS.initialState,
+      [CharId.karim]: CHARACTERS.KARIM.initialState,
+      [CharId.hafiz]: CHARACTERS.HAFIZ.initialState,
+      [CharId.tariq]: CHARACTERS.TARIQ.initialState
+    },
+    links: [],
+    lot9CabinetUnlocked: false,
+    night5Reconstructed: false,
+    finalExcavated: false,
+    flags: {}
+  };
+}
+
+export class GameController {
+  constructor(storage = window.localStorage) {
+    this.storage = storage;
+    this.state = DEFAULT_STATE();
+  }
+
+  reset() {
+    this.state = DEFAULT_STATE();
+    return this.state;
+  }
+
+  save() {
+    try {
+      this.storage.setItem(SAVE_KEY, JSON.stringify(this.state));
+      return true;
+    } catch (err) {
+      console.error('Could not save game:', err);
+      return false;
+    }
+  }
+
+  hasSave() {
+    try {
+      return Boolean(this.storage.getItem(SAVE_KEY));
+    } catch {
+      return false;
+    }
+  }
+
+  load() {
+    try {
+      const raw = this.storage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      const defaults = DEFAULT_STATE();
+      const validEvidence = Array.isArray(saved.evidence)
+        ? [...new Set(saved.evidence.filter((id) => Boolean(EVIDENCE_DB[id])))]
+        : [];
+      const validExamined = Array.isArray(saved.examined)
+        ? [...new Set(saved.examined.filter((id) => Boolean(EVIDENCE_DB[id])))]
+        : [];
+      const validStatements = Array.isArray(saved.statements)
+        ? [...new Set(saved.statements)]
+        : [];
+      const validLinks = Array.isArray(saved.links)
+        ? [...new Set(saved.links.filter((id) => CONTRADICTIONS.some((c) => c.id === id)))]
+        : [];
+      const validLocations = new Set(Object.values(LocationId));
+
+      this.state = {
+        ...defaults,
+        ...saved,
+        night: Number.isInteger(saved.night) && saved.night >= 1 && saved.night <= 6 ? saved.night : 1,
+        location: validLocations.has(saved.location) ? saved.location : LocationId.office,
+        evidence: validEvidence,
+        examined: validExamined,
+        statements: validStatements,
+        links: validLinks,
+        lot9CabinetUnlocked: Boolean(saved.lot9CabinetUnlocked),
+        night5Reconstructed: Boolean(saved.night5Reconstructed),
+        finalExcavated: Boolean(saved.finalExcavated),
+        charStates: {
+          ...defaults.charStates,
+          ...(saved.charStates && typeof saved.charStates === 'object' ? saved.charStates : {})
+        },
+        flags: {
+          ...defaults.flags,
+          ...(saved.flags && typeof saved.flags === 'object' ? saved.flags : {})
+        }
+      };
+      return true;
+    } catch (error) {
+      console.error('Could not load saved game:', error);
+      try {
+        this.storage.removeItem(SAVE_KEY);
+      } catch {
+        // Ignore storage removal errors
+      }
+      return false;
+    }
+  }
+
+  collectEvidence(evId) {
+    if (!EVIDENCE_DB[evId]) return false;
+    let isNew = false;
+    if (!this.state.evidence.includes(evId)) {
+      this.state.evidence.push(evId);
+      isNew = true;
+    }
+    if (!this.state.examined.includes(evId)) {
+      this.state.examined.push(evId);
+    }
+    return isNew;
+  }
+
+  recordStatement(charId) {
+    const ch = CHARACTERS[charId];
+    if (!ch) return false;
+    if (!this.state.statements.includes(ch.statementId)) {
+      this.state.statements.push(ch.statementId);
+      return true;
+    }
+    return false;
+  }
+
+  presentEvidenceToCharacter(charId, evId) {
+    const ch = CHARACTERS[charId];
+    if (!ch || !EVIDENCE_DB[evId]) return { reply: '', unlockedEvidence: null, triggerTariqCutscene: false };
+
+    const reply = ch.presentReactions[evId] || ch.presentReactions.default;
+    let unlockedEvidence = null;
+    let triggerTariqCutscene = false;
+
+    if (charId === CharId.teoh && (evId === EvidenceId.missingReport || evId === EvidenceId.officialTimeline)) {
+      this.state.charStates.TEOH = 'COOPERATIVE';
+      this.collectEvidence(EvidenceId.junctionLog);
+      unlockedEvidence = EvidenceId.junctionLog;
+    }
+    if (charId === CharId.aina && (evId === EvidenceId.missingReport || evId === EvidenceId.newspaper)) {
+      this.state.charStates.AINA = 'COOPERATIVE';
+      this.collectEvidence(EvidenceId.bedroomPhoto);
+      unlockedEvidence = EvidenceId.bedroomPhoto;
+    }
+    if (charId === CharId.karim && (evId === EvidenceId.polaroid || evId === EvidenceId.keyTag)) {
+      this.state.charStates.KARIM = 'REFUSING';
+      this.state.flags.confrontedKarim = true;
+    }
+    if (charId === CharId.hafiz && (evId === EvidenceId.junctionLog || evId === EvidenceId.repairInvoice)) {
+      this.state.charStates.HAFIZ = 'UNCOMFORTABLE';
+      this.state.flags.confrontedHafiz = true;
+    }
+    if (charId === CharId.tariq && evId === EvidenceId.letters) {
+      this.state.charStates.TARIQ = 'COOPERATIVE';
+      this.state.flags.tariqCooperated = true;
+      triggerTariqCutscene = true;
+    }
+
+    return { reply, unlockedEvidence, triggerTariqCutscene };
+  }
+
+  tryLinkNodes(nodeA, nodeB) {
+    const match = CONTRADICTIONS.find(
+      (c) => (c.a === nodeA && c.b === nodeB) || (c.b === nodeA && c.a === nodeB)
+    );
+    if (!match) return { matched: false, alreadyLinked: false, contradiction: null };
+    if (this.state.links.includes(match.id)) {
+      return { matched: true, alreadyLinked: true, contradiction: match };
+    }
+    this.state.links.push(match.id);
+    return { matched: true, alreadyLinked: false, contradiction: match };
+  }
+
+  verifyReconstruction(selectedIndices) {
+    if (!Array.isArray(selectedIndices) || selectedIndices.length !== 8) return false;
+    const valid = selectedIndices.every((val, idx) => Number(val) === idx);
+    if (valid) {
+      this.state.night5Reconstructed = true;
+    }
+    return valid;
+  }
+
+  canAdvanceNight() {
+    const s = this.state;
+    if (s.night === 1) {
+      return [EvidenceId.missingReport, EvidenceId.newspaper, EvidenceId.officialPhoto, EvidenceId.officialTimeline]
+        .every((id) => s.evidence.includes(id));
+    }
+    if (s.night === 2) {
+      return [ContradictionId.departureTime, ContradictionId.missingSuitcase, ContradictionId.hafizAlibi]
+        .every((cid) => s.links.includes(cid));
+    }
+    if (s.night === 3) {
+      return s.evidence.includes(EvidenceId.polaroid) && s.links.includes(ContradictionId.photoDate);
+    }
+    if (s.night === 4) {
+      return [
+        EvidenceId.keyTag,
+        EvidenceId.repairInvoice,
+        EvidenceId.letters,
+        EvidenceId.concreteDocket,
+        EvidenceId.headlampBezel
+      ].every((id) => s.evidence.includes(id));
+    }
+    if (s.night === 5) {
+      return Boolean(s.flags.tariqCooperated) &&
+        s.links.includes(ContradictionId.depotAccess) &&
+        s.links.includes(ContradictionId.meetingMotive) &&
+        s.night5Reconstructed;
+    }
+    return false;
+  }
+
+  advanceNight() {
+    if (!this.canAdvanceNight() || this.state.night >= 6) return false;
+    this.state.night += 1;
+    this.save();
+    return true;
+  }
+}

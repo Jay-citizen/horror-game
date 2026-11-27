@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAKANIGADIH'S DISAPPEARANCE — PS1 Detective Mystery</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="ps1-canvas" width="320" height="240" aria-label="3D Investigation Viewport"></canvas>
+  <div id="crt-dither" aria-hidden="true"></div>
+  <div id="crosshair" aria-hidden="true"></div>
+
+  <!-- HUD -->
+  <header id="hud" aria-label="Investigation Heads-Up Display">
+    <div class="hud-box">
+      <div class="hud-night" id="hud-night">NIGHT 1 — THE OFFICE</div>
+      <div class="hud-loc" id="hud-loc">Precinct 4 Cold Case Desk</div>
+      <div class="hud-lead" id="hud-lead">Review the 2023 case files on your desk before ending the night.</div>
+    </div>
+    <nav class="hud-btns" aria-label="Quick Actions">
+      <button type="button" class="btn" id="btn-nb" aria-label="Open Investigation Notebook (Tab)">NOTEBOOK [TAB]</button>
+      <button type="button" class="btn" id="btn-flash" aria-label="Toggle Flashlight (R)" aria-pressed="false">LIGHT [R]: OFF</button>
+      <button type="button" class="btn" id="btn-pause" aria-label="Pause Game (Escape)">PAUSE [ESC]</button>
+    </nav>
+    <div id="prompt" role="status" aria-live="polite">
+      <span class="k">E / LMB</span>
+      <span id="prompt-txt">Inspect</span>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="controls-bar">
+      WASD: Move | Mouse: Look | Shift: Sprint | C: Crouch | Space: Jump | E/Click: Interact | R: Light | Tab: Notebook | ESC: Pause
+    </div>
+  </header>
+
+  <!-- DIALOGUE -->
+  <section id="dialogue" role="dialog" aria-modal="true" aria-labelledby="dlg-speaker">
+    <div class="dlg-head">
+      <span class="dlg-speaker" id="dlg-speaker">Name</span>
+      <span class="dlg-state" id="dlg-state">COOPERATIVE</span>
+    </div>
+    <div class="dlg-line" id="dlg-line"></div>
+    <div class="dlg-opts" id="dlg-opts"></div>
+  </section>
+
+  <!-- MODAL (Notebook / Evidence Viewer / Case Board / Map / Pause) -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <div class="window">
+      <div class="win-head">
+        <h2 id="win-title">NOTEBOOK</h2>
+        <button type="button" class="btn" id="win-close" aria-label="Close Window (Escape)">CLOSE [ESC]</button>
+      </div>
+      <div class="tabs" id="nb-tabs" role="tablist" aria-label="Notebook Sections" hidden>
+        <button type="button" role="tab" class="tab active" data-t="evidence" aria-selected="true">Evidence</button>
+        <button type="button" role="tab" class="tab" data-t="statements" aria-selected="false">Statements</button>
+        <button type="button" role="tab" class="tab" data-t="timeline" aria-selected="false">Timeline</button>
+        <button type="button" role="tab" class="tab" data-t="map" aria-selected="false">Map</button>
+        <button type="button" role="tab" class="tab" data-t="hints" aria-selected="false">Hints</button>
+      </div>
+      <div class="win-body" id="win-body"></div>
+    </div>
+  </div>
+
+  <!-- CUTSCENE -->
+  <section id="cutscene" role="dialog" aria-modal="true" aria-labelledby="cine-tag">
+    <div class="cine-box">
+      <div class="cine-tag" id="cine-tag">NIGHT 1 — PRECINCT 4</div>
+      <div class="cine-body" id="cine-body"></div>
+      <div class="cine-actions">
+        <button type="button" class="btn primary" id="cine-next">NEXT</button>
+        <button type="button" class="btn" id="cine-skip">SKIP CUTSCENE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TITLE SCREEN -->
+  <main id="title-screen">
+    <div class="title-kicker">PRECINCT 4 COLD CASE FILE #2023-1014</div>
+    <h1 class="title-heading">SAKANIGADIH'S DISAPPEARANCE</h1>
+    <p class="title-sub">
+      Autumn 2026. Three years after 17-year-old Sakanigadih binti Osman vanished, Detective Noriah Lim pulls the abandoned file in secret. Search, question, compare evidence, and uncover what really happened.
+    </p>
+    <div class="title-menu">
+      <button type="button" class="btn primary" id="btn-start">NEW INVESTIGATION</button>
+      <button type="button" class="btn" id="btn-load" disabled>CONTINUE CHECKPOINT</button>
+      <button type="button" class="btn" id="btn-tests">RUN DIAGNOSTIC UNIT TESTS</button>
+    </div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

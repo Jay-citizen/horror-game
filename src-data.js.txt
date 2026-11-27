@@ -1,0 +1,550 @@
+export const EvidenceId = Object.freeze({
+  missingReport: 'EV01',
+  newspaper: 'EV02',
+  officialPhoto: 'EV03',
+  officialTimeline: 'EV04',
+  debateRoster: 'EV05',
+  bedroomPhoto: 'EV06',
+  junctionLog: 'EV07',
+  polaroid: 'EV08',
+  keyTag: 'EV09',
+  repairInvoice: 'EV10',
+  letters: 'EV11',
+  concreteDocket: 'EV12',
+  headlampBezel: 'EV13',
+  shedEvidence: 'EV14'
+});
+
+export const LocationId = Object.freeze({
+  office: 'OFFICE',
+  residential: 'RESIDENTIAL',
+  depotExt: 'DEPOT_EXT',
+  lot9: 'LOT9',
+  university: 'UNIVERSITY',
+  lot14: 'LOT14'
+});
+
+export const CharId = Object.freeze({
+  parents: 'PARENTS',
+  salmah: 'SALMAH',
+  teoh: 'TEOH',
+  aina: 'AINA',
+  darius: 'DARIUS',
+  karim: 'KARIM',
+  hafiz: 'HAFIZ',
+  tariq: 'TARIQ'
+});
+
+export const ContradictionId = Object.freeze({
+  departureTime: 'C1',
+  missingSuitcase: 'C2',
+  photoDate: 'C3',
+  depotAccess: 'C4',
+  hafizAlibi: 'C5',
+  meetingMotive: 'C6'
+});
+
+export const EVIDENCE_DB = Object.freeze({
+  EV01: {
+    id: 'EV01',
+    type: 'document',
+    title: '2023 Official Missing Person Report',
+    loc: 'Precinct 4 Cold Case Desk',
+    night: 1,
+    source: 'Precinct 4 Archive',
+    summary: 'Filed 15 Oct 2023 by Encik Osman. Claims Sakanigadih (17) ran away at 19:00 on 14 Oct 2023 carrying a blue hard-shell suitcase.',
+    detail: [
+      'ROYAL MALAYSIA POLICE — PRECINCT 4',
+      'CASE #2023-1014 | STATUS: CLOSED (RUNAWAY)',
+      'Subject: Sakanigadih binti Osman (Age 17)',
+      'Reported Missing: 15 October 2023, 08:10',
+      'Complainant: Encik Osman bin Sulaiman (Father)',
+      '',
+      'STATEMENT SUMMARY:',
+      'Complainant reports subject departed the family residence on foot at approximately 19:00 on Saturday, 14 October 2023 following an argument over pre-university examinations.',
+      'Subject allegedly carried a blue hard-shell suitcase and personal clothing. No suspicious activity or third-party involvement reported.'
+    ].join('\n')
+  },
+  EV02: {
+    id: 'EV02',
+    type: 'document',
+    title: 'October 2023 Newspaper Clipping',
+    loc: 'Precinct 4 Corkboard',
+    night: 1,
+    source: 'The Daily Chronicle Archive',
+    summary: 'Article quoting family spokesperson claiming Sakanigadih packed her blue suitcase and left voluntarily due to academic stress.',
+    detail: [
+      'THE DAILY CHRONICLE — 18 OCTOBER 2023',
+      '"LOCAL TEENAGER STILL MISSING AFTER EXAM STRESS"',
+      '',
+      'Representatives of Osman Timber & Transport confirmed yesterday that 17-year-old Sakanigadih binti Osman left home voluntarily on Saturday evening (14 Oct) carrying her blue hard-shell suitcase.',
+      '"She had been overwhelmed by pre-university exams and kept no secrets from her family," a family spokesperson stated, urging the public to respect their privacy.'
+    ].join('\n')
+  },
+  EV03: {
+    id: 'EV03',
+    type: 'photo',
+    title: '2023 Official Case Photo Set',
+    loc: 'Precinct 4 Filing Cabinet',
+    night: 1,
+    source: '2023 Investigating Officer',
+    summary: 'School ID portrait attached to the 2023 file showing Sakanigadih wearing her SMK Seri Sungai prefect badge and canvas satchel strap.',
+    frontText: '[PORTRAIT PHOTO: Sakanigadih binti Osman, age 17, wearing her SMK Seri Sungai school uniform with a worn olive canvas satchel strap slung across her shoulder.]',
+    backText: 'STAMPED: PRECINCT 4 EVIDENCE UNIT — OCTOBER 2023\nHandwritten note: "Supplied by Encik Osman on 15/10/2023. Last known likeness."'
+  },
+  EV04: {
+    id: 'EV04',
+    type: 'document',
+    title: '2023 Official Police Timeline',
+    loc: 'Precinct 4 Desk Folder',
+    night: 1,
+    source: 'Precinct 4 Archive',
+    summary: 'States Sakanigadih withdrew from school and cut all contact after 10 Oct 2023, before departing at 19:00 on 14 Oct.',
+    detail: [
+      'OFFICIAL CASE TIMELINE (#2023-1014)',
+      '- 10 Oct 2023: Subject allegedly stops attending school activities and cuts contact with peers.',
+      '- 14 Oct 2023, 19:00: Subject leaves Osman residence on foot with blue suitcase.',
+      '- 15 Oct 2023, 08:10: Parents file runaway report at Precinct 4.',
+      '- 02 Nov 2023: Investigation suspended; classified as voluntary runaway.'
+    ].join('\n')
+  },
+  EV05: {
+    id: 'EV05',
+    type: 'document',
+    title: 'SMK Seri Sungai Debate & Attendance Roster',
+    loc: 'Darius Menon (Residential Street)',
+    night: 2,
+    source: 'Darius Menon',
+    summary: 'School log showing Sakanigadih attended debate prep on 11 & 13 Oct 2023 alongside debate partner Tariq Zulkifli (T.Z.).',
+    detail: [
+      'SMK SERI SUNGAI — DEBATE SOCIETY LOG (OCTOBER 2023)',
+      '11 Oct 2023: Present — Sakanigadih Osman, Darius Menon, Tariq Zulkifli.',
+      '13 Oct 2023: Present — Sakanigadih Osman (brought old municipal & timber archive folders), Tariq Zulkifli.',
+      'Darius’s Margin Note: "She never went anywhere without her olive canvas satchel."'
+    ].join('\n')
+  },
+  EV06: {
+    id: 'EV06',
+    type: 'photo',
+    title: 'Aina’s Bedroom Sketch & Photo',
+    loc: 'Aina Farhana (Residential Street)',
+    night: 2,
+    source: 'Aina Farhana',
+    summary: 'Photo taken by Aina inside Sakanigadih’s bedroom on 16 Oct 2023: the blue hard-shell suitcase is still inside the open closet.',
+    frontText: '[BEDROOM PHOTO: Sakanigadih’s bedroom taken 16 Oct 2023. Through the half-open wardrobe door sits a large blue hard-shell suitcase. The wall hook for her olive canvas satchel is empty.]',
+    backText: 'Aina’s handwritten note:\n"16/10/2023 — Puan Zainab let me leave flowers in her room. Her blue suitcase was sitting right there in the closet! Only her olive canvas satchel was gone."'
+  },
+  EV07: {
+    id: 'EV07',
+    type: 'document',
+    title: 'Teoh Sundry Shop Delivery & CCTV Log',
+    loc: 'Mr. Teoh Boon Hock (Lot 16)',
+    night: 2,
+    source: 'Mr. Teoh Boon Hock',
+    summary: 'Timestamped camera & delivery ledger at the orchard lane junction showing Hafiz’s silver pickup entering at 21:05 on 14 Oct 2023.',
+    detail: [
+      'TEOH SUNDRY SHOP (LOT 16) — LANE JUNCTION LOG',
+      'Date: Saturday, 14 October 2023',
+      '20:42 — Evening sundry delivery van departs.',
+      '21:05 — Silver 4x4 Pickup (Plate WXY 4418, Osman Timber) turns onto Private Orchard Lane toward Lot 14.',
+      '21:48 — Same silver pickup exits Private Orchard Lane at high speed.'
+    ].join('\n')
+  },
+  EV08: {
+    id: 'EV08',
+    type: 'photo',
+    title: 'Anonymous Polaroid Photograph',
+    loc: 'Slipped under Precinct 4 Office Door',
+    night: 3,
+    source: 'Anonymous Sender',
+    summary: 'Polaroid showing Sakanigadih alive outside Lot 9 Storage Depot holding a ledger. Back is dated 12 Oct 2023.',
+    frontText: '[POLAROID PHOTO: Sakanigadih standing beside a corrugated warehouse door stenciled "OSMAN TIMBER — LOT 9 DEPOT", holding a cloth-bound workshop ledger.]',
+    backText: 'Handwritten in neat blue ink:\n"12 October 2023 — 16:20\nLot 9 Storage Building, Jalan Kilang Lama.\nShe found what they hid in 2016. Look inside."'
+  },
+  EV09: {
+    id: 'EV09',
+    type: 'document',
+    title: 'Fresh Brass Key Tag (Oct 2023)',
+    loc: 'Lot 9 Storage Building — Front Desk Drawer',
+    night: 4,
+    source: 'Lot 9 Office Desk',
+    summary: 'Stamped brass key tag and sign-out slip dated 11 Oct 2023—disproving Pak Cik Karim’s claim that Lot 9 was welded shut since 2018.',
+    detail: [
+      'LOT 9 DEPOT KEY TAG & SIGN-OUT SLIP',
+      'Tag Stamp: LOT 9 INNER ARCHIVE — KEY #02',
+      'Sign-Out Date: 11 October 2023',
+      'Authorized by: Karim bin Sulaiman',
+      'Physical Inspection: Bright unoxidized brass; inner cabinet lock oiled recently.'
+    ].join('\n')
+  },
+  EV10: {
+    id: 'EV10',
+    type: 'document',
+    title: '2016 Silent Workshop Repair Invoice',
+    loc: 'Lot 9 Storage Building — Stash Bag',
+    night: 4,
+    source: 'Sakanigadih’s Stash Bag',
+    summary: 'Hidden 2016 invoice for scrapping a damaged pickup bumper on 10 Nov 2016—one day after cyclist Encik Roslan’s fatal hit-and-run.',
+    detail: [
+      'CONFIDENTIAL CASH VOUCHER — 10 NOVEMBER 2016',
+      'Vehicle: Osman Timber Pickup WXY 4418 (Driver: Hafiz Osman, age 19)',
+      'Work Performed: Front grille & right headlamp replacement, chassis repaint, silent scrap disposal of damaged parts.',
+      'Police Report Filed: NONE (Incident: Jalan Lama Sungai, 09/11/2016 — cyclist Encik Roslan fatally struck).',
+      'Approved by: Osman bin Sulaiman & Karim bin Sulaiman.'
+    ].join('\n')
+  },
+  EV11: {
+    id: 'EV11',
+    type: 'document',
+    title: 'Draft Letters Between Sakanigadih & "T.Z."',
+    loc: 'Lot 9 Storage Building — Stash Bag',
+    night: 4,
+    source: 'Sakanigadih’s Stash Bag',
+    summary: 'Letters planning a 21:30 handover on 14 Oct 2023 behind the Lot 14 Osman Timber Annex so T.Z. can publish the 2016 cover-up.',
+    detail: [
+      'FOLDED NOTEBOOK LETTERS (OCTOBER 2023)',
+      'From: Sakanigadih | To: T.Z.',
+      '"They covered up the 2016 Jalan Lama Sungai crash that killed Encik Roslan. Hafiz was driving drunk. I have the 2016 invoice and damaged headlamp bezel in my canvas satchel.',
+      'Meet me Saturday 14 Oct at 21:30 behind the disused Lot 14 Osman Timber Annex in the private orchard. Bring your press camera. — S."',
+      '',
+      'Reply signed: "I will be at Lot 14 by 21:30 sharp. Keep the satchel safe. — T.Z."'
+    ].join('\n')
+  },
+  EV12: {
+    id: 'EV12',
+    type: 'document',
+    title: '15 Oct 2023 Concrete-Pour Delivery Docket',
+    loc: 'Lot 9 Storage Building — Archive Crate',
+    night: 4,
+    source: 'Lot 9 Archive Crate',
+    summary: 'Emergency Sunday morning concrete delivery docket dated 15 Oct 2023 for the Lot 14 Orchard Tool Shed floor.',
+    detail: [
+      'EXPRESS READY-MIX CONCRETE DOCKET',
+      'Delivery Date: Sunday, 15 October 2023 — 06:15 AM',
+      'Destination: Lot 14 Private Orchard Tool Shed (Osman Property)',
+      'Ordered by: Karim bin Sulaiman & Osman bin Sulaiman',
+      'Special Instruction: "Urgent interior floor slab pour — leave mixer at gate; family crew will finish."'
+    ].join('\n')
+  },
+  EV13: {
+    id: 'EV13',
+    type: 'item',
+    title: 'Damaged Pickup Headlamp Bezel',
+    loc: 'Lot 9 Storage Building — Locked Metal Cabinet',
+    night: 4,
+    source: 'Locked Archive Cabinet',
+    summary: 'Dented 2016 pickup headlamp rim matching the Jalan Lama Sungai hit-and-run vehicle, hidden inside Lot 9.',
+    detail: [
+      'PHYSICAL ITEM #EV13',
+      'Dented chrome headlamp bezel from a 2015-series 4x4 pickup truck.',
+      'Faint dark residue along the inner flange, wrapped inside a 2016 Osman Timber workshop rag.'
+    ].join('\n')
+  },
+  EV14: {
+    id: 'EV14',
+    type: 'item',
+    title: 'Lot 14 Shed Physical Evidence Bundle',
+    loc: 'Lot 14 Orchard Tool Shed (Beneath Concrete Patch)',
+    night: 6,
+    source: 'Lot 14 Concrete Excavation',
+    summary: 'Recovered beneath the 15 Oct 2023 concrete patch: the cast-iron survey marker, charred jacket zipper, and canvas satchel with the 2016 ledger.',
+    detail: [
+      'FINAL NIGHT PHYSICAL EVIDENCE (SECURED WITH FORENSIC CARE)',
+      '1. Cast-iron boundary survey marker bearing trace impact residue.',
+      '2. Charred brass zipper and fabric fragments from Sakanigadih’s outer jacket.',
+      '3. Water-stained olive canvas satchel containing the original 2016 workshop ledger.',
+      '(Site preserved respectfully for Supt. Farahiyah’s forensic recovery unit.)'
+    ].join('\n')
+  }
+});
+
+export const CONTRADICTIONS = Object.freeze([
+  {
+    id: ContradictionId.departureTime,
+    a: EvidenceId.missingReport,
+    b: 'ST_SALMAH',
+    title: 'C1: Runaway Departure Time (19:00 vs 20:35)',
+    desc: 'EV01 claims Sakanigadih left at 19:00, but Mak Cik Salmah saw her studying at her window at 20:35.'
+  },
+  {
+    id: ContradictionId.missingSuitcase,
+    a: EvidenceId.newspaper,
+    b: EvidenceId.bedroomPhoto,
+    title: 'C2: Missing Blue Suitcase Claim',
+    desc: 'EV02 claims she took her blue suitcase, but EV06 proves the suitcase stayed in her closet; only her satchel vanished.'
+  },
+  {
+    id: ContradictionId.photoDate,
+    a: EvidenceId.officialTimeline,
+    b: EvidenceId.polaroid,
+    title: 'C3: Official Timeline vs 12 Oct Polaroid',
+    desc: 'EV04 claims she cut contact after 10 Oct, but EV08 proves she was at Lot 9 on 12 Oct 2023.'
+  },
+  {
+    id: ContradictionId.depotAccess,
+    a: 'ST_KARIM',
+    b: EvidenceId.keyTag,
+    title: 'C4: Lot 9 Welded Shut Claim',
+    desc: 'Pak Cik Karim claims Lot 9 was welded shut since 2018, but EV09 shows an Oct 2023 key tag.'
+  },
+  {
+    id: ContradictionId.hafizAlibi,
+    a: 'ST_HAFIZ',
+    b: EvidenceId.junctionLog,
+    title: 'C5: Hafiz’s Melaka Weekend Alibi',
+    desc: 'Hafiz claims he was in Melaka, but EV07 logs his pickup entering the orchard lane at 21:05 on 14 Oct.'
+  },
+  {
+    id: ContradictionId.meetingMotive,
+    a: 'ST_PARENTS',
+    b: EvidenceId.letters,
+    title: 'C6: Exam Stress vs 2016 Cover-Up Meeting',
+    desc: 'Parents claimed she left over exam stress with no secrets, but EV11 proves she arranged a 21:30 handover of the 2016 hit-and-run proof.'
+  }
+]);
+
+export const CHARACTERS = Object.freeze({
+  PARENTS: {
+    id: CharId.parents,
+    name: 'Encik Osman & Puan Zainab',
+    role: 'Sakanigadih’s Parents (Osman Residence)',
+    initialState: 'REFUSING',
+    statementId: 'ST_PARENTS',
+    statementTitle: 'Parents’ Statement (Doorstep)',
+    statementText: '"Our daughter left over exam stress at 19:00 with her suitcase. She had no secrets. Leave our property immediately."',
+    intro: 'Encik Osman stands stiffly behind the security grille while Puan Zainab looks away. "We answered every question in 2023. She ran away because of exam pressure. Do not come back."',
+    options: [
+      {
+        label: 'Ask about 14 October 2023',
+        reply: '"She took her blue suitcase at seven in the evening and walked out. We have nothing more to say to a precinct detective." (They shut the heavy oak door.)'
+      },
+      { label: 'Present Evidence', isPresent: true }
+    ],
+    presentReactions: {
+      default: 'Encik Osman refuses to look at the folder. "Speak to our family lawyer. This conversation is over."'
+    }
+  },
+  SALMAH: {
+    id: CharId.salmah,
+    name: 'Mak Cik Salmah',
+    role: 'Next-Door Neighbour (Lot 11)',
+    initialState: 'COOPERATIVE',
+    statementId: 'ST_SALMAH',
+    statementTitle: 'Mak Cik Salmah’s Statement',
+    statementText: '"Sakanigadih’s upstairs desk lamp was on and I clearly saw her reading at her window at 20:35 on 14 October 2023."',
+    intro: 'Mak Cik Salmah waters her jasmine pots by the fence. "Ah, detective? You’re asking about Sakanigadih? Good girl—always polite, never the type to run off."',
+    options: [
+      {
+        label: 'Ask about the night she vanished (14 Oct)',
+        reply: '"I remember clearly because my favourite drama started at 8:30 PM. At 20:35, I closed my curtains and saw Sakanigadih at her upstairs window, lamp on, flipping through papers."'
+      },
+      {
+        label: 'Ask about the Osman family',
+        reply: '"Very proud people. After 2016, Encik Osman and his brother Karim became awfully secretive about their timber yard."'
+      }
+    ],
+    presentReactions: {
+      EV01: '"Seven o’clock? Nonsense! I saw her at her desk window at 20:35 with my own eyes."',
+      default: '"I told the officers in 2023 that her lamp was on past half past eight, but nobody wrote it down."'
+    }
+  },
+  TEOH: {
+    id: CharId.teoh,
+    name: 'Mr. Teoh Boon Hock',
+    role: 'Retired Grocer (Lot 16)',
+    initialState: 'PARTIAL/EVASIVE',
+    statementId: 'ST_TEOH',
+    statementTitle: 'Mr. Teoh’s Statement',
+    statementText: '"My corner camera faces the orchard lane junction. Once I saw the 2023 report was wrong, I checked my old delivery log—Hafiz’s silver pickup turned in at 21:05."',
+    intro: 'Mr. Teoh wipes down his wooden counter, glancing nervously toward the Osman house. "Three years ago? My memory isn’t sharp, detective. Best leave rich families alone."',
+    options: [
+      {
+        label: 'Ask about traffic on the orchard lane',
+        reply: '"Cars come and go. I didn’t keep notes for the police back then, and nobody asked me anyway."'
+      },
+      { label: 'Present Evidence', isPresent: true }
+    ],
+    presentReactions: {
+      EV01: 'Mr. Teoh frowns at the 19:00 claim. "They told the police she left at seven? That’s a lie. Wait here..." He pulls out a dusty ledger and hands you his 14 Oct junction log (EV07).',
+      EV04: 'Mr. Teoh studies the official timeline and sighs. "They omitted the lane traffic completely. Take my 14 October delivery & camera log (EV07)—Hafiz’s pickup turned into the private orchard at 21:05."',
+      default: 'Mr. Teoh shakes his head. "Show me what the official file claims first, detective."'
+    }
+  },
+  AINA: {
+    id: CharId.aina,
+    name: 'Aina Farhana',
+    role: 'Childhood Best Friend',
+    initialState: 'UNCOMFORTABLE',
+    statementId: 'ST_AINA',
+    statementTitle: 'Aina’s Statement',
+    statementText: '"Sakanigadih called me at 20:50 on 14 Oct sounding urgent, saying she found proof of an old accident. Her blue suitcase never left her closet."',
+    intro: 'Aina twists her fingers around her tote strap. "I still feel awful... I missed her call at 8:50 PM that night because my phone was on silent."',
+    options: [
+      {
+        label: 'Ask about her last contact with Sakanigadih',
+        reply: '"She called me at 20:50 on 14 October. When I called back at 21:25, it went straight to voicemail. Why would she call me at 20:50 if she supposedly ran away at 19:00?"'
+      },
+      { label: 'Present Evidence', isPresent: true }
+    ],
+    presentReactions: {
+      EV02: 'Aina looks at the newspaper clipping and tears up. "She didn’t take her blue suitcase! I took a photo in her room two days later—here, take it (EV06)."',
+      EV01: 'Aina points at the suitcase line. "That’s false. Look at the photo I took in her bedroom on 16 October (EV06)—the suitcase was still in her closet!"',
+      default: 'Aina nods quietly. "She seemed scared about something she found in an old ledger."'
+    }
+  },
+  DARIUS: {
+    id: CharId.darius,
+    name: 'Darius Menon',
+    role: 'Childhood Friend & Debate Teammate',
+    initialState: 'COOPERATIVE',
+    statementId: 'ST_DARIUS',
+    statementTitle: 'Darius’s Statement',
+    statementText: '"Sakanigadih carried her olive canvas satchel everywhere. She was working with our debate teammate Tariq Zulkifli (T.Z.) on a local history project."',
+    intro: 'Darius adjusts his glasses. "I always knew the runaway story made zero sense. Sakanigadih was preparing for university scholarships."',
+    options: [
+      {
+        label: 'Ask about her habits and belongings',
+        reply: '"She never used a suitcase for anything. She carried an olive canvas satchel everywhere—for debate notes, ledgers, everything."'
+      },
+      {
+        label: 'Ask who she worked with in October 2023',
+        reply: '"She and our debate partner Tariq Zulkifli—everyone called him T.Z.—were digging through old town records. Here is our October debate roster (EV05). Tariq studies journalism at the university library now."'
+      }
+    ],
+    presentReactions: {
+      EV11: 'Darius inspects the initials "T.Z." on the letter. "That’s Tariq Zulkifli, 100%. He’s at the University Press Archive Room every evening."',
+      default: '"Check the debate roster I gave you—Tariq Zulkifli was her closest research partner."'
+    }
+  },
+  KARIM: {
+    id: CharId.karim,
+    name: 'Pak Cik Karim',
+    role: 'Uncle & Owner of Lot 9 Storage Building',
+    initialState: 'PARTIAL/EVASIVE',
+    statementId: 'ST_KARIM',
+    statementTitle: 'Pak Cik Karim’s Statement',
+    statementText: '"The Lot 9 storage depot has been welded shut since 2018. Sakanigadih never had a key and never went near it."',
+    intro: 'Pak Cik Karim leans against his pickup outside the depot yard, eyes narrowed. "You’re poking into closed family grief, detective. There’s nothing here."',
+    options: [
+      {
+        label: 'Ask about the Lot 9 Storage Building',
+        reply: '"Lot 9 has been welded shut since 2018. Nobody goes inside, least of all my niece."'
+      },
+      { label: 'Present Evidence', isPresent: true }
+    ],
+    presentReactions: {
+      EV09: 'Karim stares at the October 2023 brass key tag, his jaw clenching. "Where did you get that? You’re trespassing on private business. Get out of my sight!"',
+      EV08: 'Karim’s face pales as he sees the 12 Oct Polaroid outside Lot 9. "That photo proves nothing! Leave my yard now!"',
+      default: 'Karim waves a hand dismissively. "Old timber scrap. Nothing to do with my niece."'
+    }
+  },
+  HAFIZ: {
+    id: CharId.hafiz,
+    name: 'Hafiz Osman',
+    role: 'Older Cousin (Age 29, Osman Timber Manager)',
+    initialState: 'PARTIAL/EVASIVE',
+    statementId: 'ST_HAFIZ',
+    statementTitle: 'Hafiz’s Statement',
+    statementText: '"I was in Melaka all weekend on 14 October 2023. I wasn’t anywhere near the family orchard."',
+    intro: 'Hafiz offers a practiced, polite smile. "Detective Lim, right? Terrible tragedy, though my cousin always was impulsive. How can I help?"',
+    options: [
+      {
+        label: 'Ask where he was on 14 October 2023',
+        reply: '"I drove down to Melaka on Friday afternoon and stayed there the entire weekend on 14 October. My schedule is spotless."'
+      },
+      { label: 'Present Evidence', isPresent: true }
+    ],
+    presentReactions: {
+      EV07: 'Hafiz’s polite smile vanishes as he reads Mr. Teoh’s 21:05 pickup log. Sweat beads on his temple. "That... that log must have misread the plate. I’m done talking without counsel."',
+      EV10: 'Hafiz stares at the 2016 repair voucher, voice dropping to a hoarse whisper. "You shouldn’t be digging up 2016..."',
+      default: 'Hafiz forces a tight smile. "Ancient history, detective. Focus on real crime."'
+    }
+  },
+  TARIQ: {
+    id: CharId.tariq,
+    name: 'Tariq Zulkifli',
+    role: 'Journalism Student (Age 21) & Letter-Writer',
+    initialState: 'UNCOMFORTABLE',
+    statementId: 'ST_TARIQ',
+    statementTitle: 'Tariq’s Statement',
+    statementText: '"Sakanigadih planned to meet me at 21:30 on 14 Oct at Lot 14 with proof of Hafiz’s 2016 hit-and-run. When I arrived at 21:30, the shed was empty and Hafiz’s pickup was speeding away."',
+    intro: 'Tariq glances anxiously toward the university archive door, clutching his press notebook. "I don’t know why you’re asking me. I barely knew her."',
+    options: [
+      {
+        label: 'Ask about 14 October 2023',
+        reply: '"Please—the Osman family owns half the timber contracts in this district. I have nothing to say."'
+      },
+      { label: 'Present Evidence', isPresent: true }
+    ],
+    presentReactions: {
+      EV11: 'Tariq exhales shakily upon seeing his own "T.Z." letters. "You found them... Okay. She uncovered proof that Hafiz killed cyclist Encik Roslan in a drunk hit-and-run in November 2016 and her father and uncle covered it up. She asked me to meet her at 21:30 on 14 October behind the disused Lot 14 Osman Timber Annex in the private orchard. I got there right at 21:30—she wasn’t there, her satchel strap was torn in the dirt, and Hafiz’s silver pickup was driving out of the orchard lane. I was terrified they’d come after me next."',
+      default: 'Tariq shakes his head nervously. "I can’t talk unless I know you already have the proof."'
+    }
+  }
+});
+
+export const CUTSCENES = Object.freeze({
+  night1: {
+    tag: 'NIGHT 1 — PRECINCT 4 (AUTUMN 2026)',
+    slides: [
+      'Inspector Razak tosses a dusty manila folder onto the archive cart beside Sergeant Chong:\n\n"File #2023-1014. Sakanigadih binti Osman. Three years gone, officially a runaway. Don’t waste overtime on it, Chong—the Osman family closed the book years ago."',
+      'After they leave, Detective Noriah Lim pulls the folder onto her desk. Overlooked for major assignments, she decides to investigate privately—searching, questioning, and checking every date they ignored.'
+    ]
+  },
+  night3: {
+    tag: 'NIGHT 3 — THE ANONYMOUS MESSAGE',
+    slides: [
+      'Late evening at Precinct 4. Before Detective Noriah Lim can lock up for the night, a soft scrape sounds against the frosted glass door.\n\nA plain white envelope lies on the floorboards inside the threshold—addressed simply to "Det. N. Lim".'
+    ]
+  },
+  night5: {
+    tag: 'NIGHT 5 — TARIQ’S CONFESSION',
+    slides: [
+      'Tariq Zulkifli lowers his voice inside the empty University Press Archive Room:\n\n"Sakanigadih found the 2016 repair voucher in Pak Cik Karim’s depot. Hafiz was driving drunk on Jalan Lama Sungai on 9 November 2016 when he killed cyclist Encik Roslan—and her father and uncle scrapped the pickup to bury it."',
+      '"She wrote to me so I could publish the truth. We agreed to meet at 21:30 on 14 October behind the disused Lot 14 Osman Timber Annex in the private orchard. When I arrived at 21:30, the shed was empty, her satchel strap was torn on the ground, and Hafiz’s silver pickup was speeding away."'
+    ]
+  },
+  finalReport: {
+    tag: 'FINAL NIGHT — REPORT TO SUPT. FARAHIYAH',
+    slides: [
+      '02:40 AM — Lot 14 Private Orchard.\n\nForensic units under Superintendent Farahiyah cordon off the Orchard Tool Shed. Beneath the 15 October 2023 concrete slab, investigators recover the cast-iron boundary marker, charred jacket remnants, and Sakanigadih’s olive canvas satchel containing the 2016 Osman Timber repair ledger.',
+      'Supt. Farahiyah reviews Detective Noriah Lim’s compiled case file:\n\n"Every timeline contradiction, Mr. Teoh’s junction log, Tariq Zulkifli’s testimony, and the physical evidence align. Warrants are issued tonight for Hafiz Osman, Encik Osman, and Pak Cik Karim—and the 2016 hit-and-run killing of Encik Roslan is officially reopened."'
+    ]
+  },
+  epilogue: {
+    tag: 'EPILOGUE — CASE CLOSED',
+    slides: [
+      'Two weeks later at Precinct 4 Headquarters.\n\nIn the hallway outside Major Crimes, Mrs. Halimah—the retired Lot 9 bookkeeper—quietly approaches Noriah: "I kept that 12 October Polaroid for three years waiting for someone brave enough to read the file properly."',
+      'Inspector Razak and Sergeant Chong stand quietly at the back of the press room as Superintendent Farahiyah formally commends Detective Noriah Lim. Sakanigadih binti Osman is laid to rest with dignity, and both families finally receive justice.\n\nNoriah took the cold file hoping for recognition—and uncovered a truth far larger than ambition.\n\n— THE END —\nSAKANIGADIH’S DISAPPEARANCE'
+    ]
+  }
+});
+
+export const RECONSTRUCTION_STEPS = Object.freeze([
+  '19:00 — Parents claim Sakanigadih left with a suitcase (False)',
+  '20:35 — Mak Cik Salmah sees Sakanigadih studying at her window',
+  '21:05 — Hafiz’s silver pickup enters the private orchard lane',
+  '21:15 — Confrontation at Lot 14; fatal fall onto survey marker',
+  '21:30 — Tariq arrives at Lot 14 to an empty shed & torn strap',
+  'Night — Hafiz calls Encik Osman & Pak Cik Karim; jacket burned',
+  '06:15 (15 Oct) — Fresh concrete poured over Lot 14 tool shed floor',
+  '08:10 (15 Oct) — Parents file fabricated runaway report'
+]);
+
+export const NIGHT_HINTS = Object.freeze({
+  1: 'Examine all four items in your office: the desk folder (EV01), timeline sheet (EV04), filing cabinet (EV03), and corkboard clipping (EV02). Then open the Map tab to end Night 1.',
+  2: 'Visit the Residential Street & Depot Exterior. Present EV01/EV02 to Aina and EV01/EV04 to Mr. Teoh, talk to Salmah, Darius, Karim, and Hafiz, then link C1, C2, and C5 on the Case Board.',
+  3: 'Pick up the white envelope under your office door (EV08), flip the photo to read the date & Lot 9 address, then link EV04 + EV08 (C3) on the Case Board.',
+  4: 'Travel to Lot 9 Storage Building. Search the front desk drawer for the key tag (EV09), search the stash bag behind the crates (EV10, EV11), check the file crate (EV12), and unlock the metal cabinet (EV13).',
+  5: 'Visit the University Press Archive and present EV11 to Tariq. Confront Karim with EV09 and Hafiz with EV07. Link C4 & C6 on the Case Board and complete the 8-step Final Night Timeline.',
+  6: 'Travel to Lot 14 Private Orchard Tool Shed, inspect the fresh concrete floor patch (EV14), and interact with the exit gate to report everything to Supt. Farahiyah.'
+});
+
+export const NIGHT_OBJECTIVES = Object.freeze({
+  1: ['NIGHT 1 — THE OFFICE', 'Examine all four 2023 case documents in your office, then end Night 1 via the Map.'],
+  2: ['NIGHT 2 — INITIAL INVESTIGATION', 'Interview the parents, neighbours, friends & relatives, then link C1, C2 & C5 on the Case Board.'],
+  3: ['NIGHT 3 — THE ANONYMOUS MESSAGE', 'Inspect the Polaroid slipped under your office door (EV08) and link C3 on the Case Board.'],
+  4: ['NIGHT 4 — LOT 9 STORAGE BUILDING', 'Search Lot 9 for the desk key tag, hidden stash bag, archive docket & locked cabinet.'],
+  5: ['NIGHT 5 — THE TRUTH', 'Question Tariq at the University Archive, confront Karim & Hafiz, and reconstruct the final night on the Case Board.'],
+  6: ['FINAL NIGHT — CASE CLOSURE', 'Travel to the Lot 14 Private Orchard Tool Shed, inspect the concrete patch, and report to Supt. Farahiyah.']
+});

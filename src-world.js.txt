@@ -1,0 +1,398 @@
+import * as THREE from 'three';
+import { EvidenceId, LocationId, CharId, CHARACTERS } from './data.js';
+
+export class WorldManager {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'low-power' });
+    this.renderer.setSize(320, 240, false);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+
+    this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.FogExp2(0x090b10, 0.042);
+
+    this.camera = new THREE.PerspectiveCamera(65, 320 / 240, 0.1, 65);
+    this.camera.rotation.order = 'YXZ';
+
+    this.flashlight = new THREE.SpotLight(0xfff1d6, 0, 22, Math.PI / 5, 0.35, 1.2);
+    this.flashlight.castShadow = true;
+    this.camera.add(this.flashlight);
+    this.camera.add(this.flashlight.target);
+    this.flashlight.target.position.set(0, 0, -5);
+    this.scene.add(this.camera);
+
+    this.flashlightOn = false;
+    this.interactables = [];
+    this.colliders = [];
+    this.currentSurface = 'wood';
+  }
+
+  setFlashlight(on) {
+    this.flashlightOn = Boolean(on);
+    this.flashlight.intensity = this.flashlightOn ? 3.2 : 0;
+    const btn = document.getElementById('btn-flash');
+    if (btn) {
+      btn.textContent = `LIGHT [R]: ${this.flashlightOn ? 'ON' : 'OFF'}`;
+      btn.setAttribute('aria-pressed', String(this.flashlightOn));
+    }
+  }
+
+  disposeMaterial(material) {
+    if (!material) return;
+    if (material.map) {
+      material.map.dispose();
+    }
+    material.dispose();
+  }
+
+  clearScene() {
+    this.scene.traverse((object) => {
+      if (object.geometry) {
+        object.geometry.dispose();
+      }
+      if (Array.isArray(object.material)) {
+        object.material.forEach((mat) => this.disposeMaterial(mat));
+      } else if (object.material) {
+        this.disposeMaterial(object.material);
+      }
+    });
+
+    while (this.scene.children.length > 0) {
+      this.scene.remove(this.scene.children[0]);
+    }
+    this.scene.add(this.camera);
+    this.interactables = [];
+    this.colliders = [];
+  }
+
+  makeTex(c1, c2, pattern = 'grid') {
+    const c = document.createElement('canvas');
+    c.width = 32;
+    c.height = 32;
+    const g = c.getContext('2d');
+    g.fillStyle = c1;
+    g.fillRect(0, 0, 32, 32);
+    g.fillStyle = c2;
+    if (pattern === 'grid') {
+      g.fillRect(0, 0, 32, 2);
+      g.fillRect(0, 0, 2, 32);
+    } else if (pattern === 'wood') {
+      for (let y = 0; y < 32; y += 4) g.fillRect(0, y, 32, 1);
+    } else if (pattern === 'brick') {
+      for (let y = 0; y < 32; y += 8) {
+        g.fillRect(0, y, 32, 1);
+        g.fillRect(y % 16, y, 1, 8);
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  ps1Mat(color, tex = null) {
+    const m = new THREE.MeshLambertMaterial({ color, map: tex });
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <project_vertex>',
+        `vec4 mvPosition = modelViewMatrix * vec4( transformed, 1.0 );
+         gl_Position = projectionMatrix * mvPosition;
+         gl_Position.xyz /= gl_Position.w;
+         gl_Position.x = floor(gl_Position.x * 160.0) / 160.0;
+         gl_Position.y = floor(gl_Position.y * 120.0) / 120.0;
+         gl_Position.xyz *= gl_Position.w;`
+      );
+    };
+    return m;
+  }
+
+  addBox(w, h, d, x, y, z, mat, solid = true) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    if (solid) {
+      this.colliders.push({
+        minX: x - w / 2 - 0.35,
+        maxX: x + w / 2 + 0.35,
+        minZ: z - d / 2 - 0.35,
+        maxZ: z + d / 2 + 0.35
+      });
+    }
+    return mesh;
+  }
+
+  registerInteraction(object, label, action) {
+    object.userData.interaction = { label, action };
+    this.interactables.push(object);
+    return object;
+  }
+
+  addNPC(charId, x, z, shirtColor, onTalk) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.05, 0.38), this.ps1Mat(shirtColor));
+    body.position.y = 0.95;
+    body.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 0.42), this.ps1Mat(0xd4a988));
+    head.position.y = 1.72;
+    head.castShadow = true;
+    const legs = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.45, 0.34), this.ps1Mat(0x232733));
+    legs.position.y = 0.22;
+    g.add(body, head, legs);
+    g.position.set(x, 0, z);
+    this.scene.add(g);
+
+    this.colliders.push({
+      minX: x - 0.55,
+      maxX: x + 0.55,
+      minZ: z - 0.55,
+      maxZ: z + 0.55
+    });
+
+    const c = CHARACTERS[charId];
+    [body, head].forEach((part) => this.registerInteraction(part, `Talk to ${c.name}`, () => onTalk(charId)));
+    return g;
+  }
+
+  buildWalls(w, d, mat) {
+    this.addBox(w, 3.6, 0.4, 0, 1.8, -d / 2, mat);
+    this.addBox(w, 3.6, 0.4, 0, 1.8, d / 2, mat);
+    this.addBox(0.4, 3.6, d, -w / 2, 1.8, 0, mat);
+    this.addBox(0.4, 3.6, d, w / 2, 1.8, 0, mat);
+  }
+
+  buildLocation(locId, game, handlers) {
+    this.clearScene();
+    game.state.location = locId;
+
+    const woodFloor = this.ps1Mat(0x523b28, this.makeTex('#523b28', '#3c2a1b', 'wood'));
+    const concFloor = this.ps1Mat(0x464b54, this.makeTex('#464b54', '#353940', 'grid'));
+    const gravelFloor = this.ps1Mat(0x3a3833, this.makeTex('#3a3833', '#292722', 'grid'));
+    const wallMat = this.ps1Mat(0x6d7278, this.makeTex('#6d7278', '#565a61', 'brick'));
+    const deskMat = this.ps1Mat(0x4a321f, this.makeTex('#4a321f', '#362314', 'wood'));
+
+    if (locId === LocationId.office) {
+      this.currentSurface = 'wood';
+      this.scene.fog.color.setHex(0x0b0e14);
+      this.setFlashlight(false);
+
+      this.addBox(12, 0.2, 11, 0, -0.1, 0, woodFloor, false);
+      this.addBox(12, 0.2, 11, 0, 3.6, 0, this.ps1Mat(0x2d3138), false);
+      this.buildWalls(12, 11, wallMat);
+
+      this.scene.add(new THREE.AmbientLight(0x364258, 0.65));
+      const lamp = new THREE.PointLight(0xffb86b, 2.2, 11);
+      lamp.position.set(-2.2, 2.1, -2.2);
+      lamp.castShadow = true;
+      this.scene.add(lamp);
+
+      this.addBox(3.2, 0.85, 1.5, -2.2, 0.42, -2.5, deskMat);
+      const folder = this.addBox(0.65, 0.08, 0.5, -2.6, 0.89, -2.3, this.ps1Mat(0xc79d54), false);
+      this.registerInteraction(folder, 'Inspect 2023 Missing Person Report (EV01)', () => handlers.inspect(EvidenceId.missingReport));
+
+      const timelineDoc = this.addBox(0.55, 0.06, 0.45, -1.7, 0.88, -2.4, this.ps1Mat(0xd9d4c5), false);
+      this.registerInteraction(timelineDoc, 'Inspect 2023 Official Timeline (EV04)', () => handlers.inspect(EvidenceId.officialTimeline));
+
+      const cab = this.addBox(0.9, 1.6, 0.9, -4.6, 0.8, -3.5, this.ps1Mat(0x4f5b66));
+      this.registerInteraction(cab, 'Search Filing Cabinet Drawer (EV03)', () => handlers.inspect(EvidenceId.officialPhoto));
+
+      const cork = this.addBox(2.4, 1.3, 0.12, 1.8, 1.75, -5.2, this.ps1Mat(0x875c36), false);
+      this.registerInteraction(cork, 'Examine Newspaper Clipping (EV02)', () => handlers.inspect(EvidenceId.newspaper));
+
+      const board = this.addBox(2.8, 1.5, 0.14, 5.7, 1.75, -1.2, this.ps1Mat(0x283442), false);
+      this.registerInteraction(board, 'Open Detective Case Board', () => handlers.openBoard());
+
+      this.addBox(2.0, 0.82, 1.4, 3.2, 0.41, 2.6, deskMat);
+      const mapMesh = this.addBox(1.5, 0.05, 1.0, 3.2, 0.85, 2.6, this.ps1Mat(0x56786b), false);
+      this.registerInteraction(mapMesh, 'Open District Map / End Night', () => handlers.openNotebook('map'));
+
+      if (game.state.night >= 3) {
+        const env = this.addBox(0.45, 0.03, 0.35, 0, 0.02, 4.4, this.ps1Mat(0xf0ece1), false);
+        this.registerInteraction(env, 'Pick Up Anonymous Polaroid Under Door (EV08)', () => handlers.inspect(EvidenceId.polaroid));
+      }
+
+      this.camera.position.set(-2.0, 1.65, -0.6);
+      return { yaw: 0.25, pitch: 0 };
+    }
+
+    if (locId === LocationId.residential) {
+      this.currentSurface = 'gravel';
+      this.scene.fog.color.setHex(0x070a10);
+      this.setFlashlight(true);
+
+      this.addBox(26, 0.2, 22, 0, -0.1, 0, gravelFloor, false);
+      this.buildWalls(26, 22, this.ps1Mat(0x242a34));
+
+      const moon = new THREE.DirectionalLight(0x6b84b8, 0.65);
+      moon.position.set(6, 12, 8);
+      moon.castShadow = true;
+      this.scene.add(moon);
+      this.scene.add(new THREE.AmbientLight(0x253042, 0.55));
+
+      this.addBox(6.5, 3.2, 5.5, -6.5, 1.6, -5.5, this.ps1Mat(0x7a7468));
+      const door = this.addBox(1.2, 2.2, 0.2, -6.5, 1.1, -2.7, this.ps1Mat(0x4a2e1b));
+      this.registerInteraction(door, 'Knock on Osman Residence Door', () => handlers.talk(CharId.parents));
+      this.addNPC(CharId.parents, -5.2, -2.2, 0x3b4859, handlers.talk);
+
+      this.addBox(5.2, 2.8, 4.8, 0.5, 1.4, -5.8, this.ps1Mat(0x667368));
+      this.addNPC(CharId.salmah, 0.5, -2.5, 0x7c5278, handlers.talk);
+
+      this.addBox(5.8, 3.0, 5.0, 7.5, 1.5, -5.2, this.ps1Mat(0x6c6556));
+      this.addNPC(CharId.teoh, 7.2, -1.8, 0x4f6d6a, handlers.talk);
+
+      this.addBox(0.2, 3.5, 0.2, -1.5, 1.75, 4.2, this.ps1Mat(0x333842));
+      const stLight = new THREE.PointLight(0xffcf87, 2.0, 12);
+      stLight.position.set(-1.5, 3.3, 4.2);
+      this.scene.add(stLight);
+      this.addNPC(CharId.aina, -2.8, 4.5, 0x8f5656, handlers.talk);
+      this.addNPC(CharId.darius, -0.2, 4.6, 0x456387, handlers.talk);
+
+      const car = this.addBox(2.2, 1.2, 3.8, 8.5, 0.6, 6.5, this.ps1Mat(0x2d3846));
+      this.registerInteraction(car, 'Return to Precinct 4 Office', () => handlers.travel(LocationId.office));
+
+      this.camera.position.set(5.5, 1.65, 6.5);
+      return { yaw: 0.5, pitch: 0 };
+    }
+
+    if (locId === LocationId.depotExt) {
+      this.currentSurface = 'gravel';
+      this.scene.fog.color.setHex(0x08090d);
+      this.setFlashlight(true);
+
+      this.addBox(22, 0.2, 20, 0, -0.1, 0, gravelFloor, false);
+      this.buildWalls(22, 20, this.ps1Mat(0x22252b));
+      this.scene.add(new THREE.AmbientLight(0x28303d, 0.6));
+
+      this.addBox(9.5, 3.5, 6.0, 0, 1.75, -5.5, this.ps1Mat(0x52575e));
+      const depotDoor = this.addBox(1.8, 2.4, 0.25, 0, 1.2, -2.4, this.ps1Mat(0x38434f));
+      this.registerInteraction(
+        depotDoor,
+        game.state.night >= 4 ? 'Unlock & Enter Lot 9 Storage Building' : 'Inspect Padlocked Lot 9 Door',
+        () => {
+          if (game.state.night >= 4) {
+            handlers.travel(LocationId.lot9);
+          } else {
+            handlers.toast('Heavy steel door. You have no warrant or key to enter yet.');
+          }
+        }
+      );
+
+      this.addNPC(CharId.karim, -3.2, -1.2, 0x5c5342, handlers.talk);
+      this.addNPC(CharId.hafiz, 3.4, 1.5, 0x394b5c, handlers.talk);
+
+      const car = this.addBox(2.2, 1.2, 3.8, -7.2, 0.6, 6.2, this.ps1Mat(0x2d3846));
+      this.registerInteraction(car, 'Return to Precinct 4 Office', () => handlers.travel(LocationId.office));
+
+      this.camera.position.set(-4.5, 1.65, 6.0);
+      return { yaw: -0.3, pitch: 0 };
+    }
+
+    if (locId === LocationId.lot9) {
+      this.currentSurface = 'concrete';
+      this.scene.fog.color.setHex(0x07080b);
+      this.setFlashlight(true);
+
+      this.addBox(14, 0.2, 13, 0, -0.1, 0, concFloor, false);
+      this.addBox(14, 0.2, 13, 0, 3.6, 0, this.ps1Mat(0x25282e), false);
+      this.buildWalls(14, 13, this.ps1Mat(0x4b4f57));
+      this.scene.add(new THREE.AmbientLight(0x1e2430, 0.5));
+
+      this.addBox(2.4, 0.85, 1.2, -4.0, 0.42, -3.5, deskMat);
+      const drawer = this.addBox(0.8, 0.35, 0.9, -3.4, 0.55, -3.4, this.ps1Mat(0x69472b), false);
+      this.registerInteraction(drawer, 'Search Desk Drawer (Key Tag EV09)', () => handlers.inspect(EvidenceId.keyTag));
+
+      this.addBox(1.6, 1.4, 1.6, 4.5, 0.7, -4.2, this.ps1Mat(0x6b5335));
+      const bag = this.addBox(0.75, 0.45, 0.55, 4.6, 0.25, -2.8, this.ps1Mat(0x4d593e), false);
+      this.registerInteraction(bag, 'Search Hidden Stash Bag (EV10 & EV11)', () =>
+        handlers.inspectSequence([EvidenceId.repairInvoice, EvidenceId.letters])
+      );
+
+      const crate = this.addBox(1.3, 1.0, 1.3, -4.5, 0.5, 2.5, this.ps1Mat(0x5c4934));
+      this.registerInteraction(crate, 'Search Archive File Crate (EV12)', () => handlers.inspect(EvidenceId.concreteDocket));
+
+      const cab = this.addBox(1.1, 1.8, 0.8, 4.8, 0.9, 2.6, this.ps1Mat(0x3a434d));
+      this.registerInteraction(cab, 'Open Locked Metal Cabinet (EV13)', () => {
+        if (!game.state.evidence.includes(EvidenceId.keyTag)) {
+          handlers.toast('Locked tight. Search the front desk drawer for a key.');
+          return;
+        }
+        game.state.lot9CabinetUnlocked = true;
+        handlers.inspect(EvidenceId.headlampBezel);
+      });
+
+      const exitDoor = this.addBox(1.4, 2.3, 0.2, 0, 1.15, 6.2, this.ps1Mat(0x38434f));
+      this.registerInteraction(exitDoor, 'Exit Lot 9 & Return to Office', () => handlers.travel(LocationId.office));
+
+      this.camera.position.set(0, 1.65, 4.6);
+      return { yaw: 0, pitch: 0 };
+    }
+
+    if (locId === LocationId.university) {
+      this.currentSurface = 'wood';
+      this.scene.fog.color.setHex(0x0b0d12);
+      this.setFlashlight(false);
+
+      this.addBox(12, 0.2, 11, 0, -0.1, 0, woodFloor, false);
+      this.addBox(12, 0.2, 11, 0, 3.6, 0, this.ps1Mat(0x2e3138), false);
+      this.buildWalls(12, 11, this.ps1Mat(0x595e68));
+      this.scene.add(new THREE.AmbientLight(0x3b4454, 0.7));
+
+      const lamp = new THREE.PointLight(0xffe1a8, 2.1, 12);
+      lamp.position.set(0, 2.5, -2);
+      this.scene.add(lamp);
+
+      this.addBox(2.2, 2.4, 0.6, -3.8, 1.2, -4.5, deskMat);
+      this.addBox(2.2, 2.4, 0.6, 3.8, 1.2, -4.5, deskMat);
+      this.addBox(2.6, 0.8, 1.3, 0, 0.4, -2.2, deskMat);
+
+      this.addNPC(CharId.tariq, 0, -3.4, 0x4b6e58, handlers.talk);
+
+      const door = this.addBox(1.3, 2.3, 0.2, 0, 1.15, 5.2, this.ps1Mat(0x4a321f));
+      this.registerInteraction(door, 'Return to Precinct 4 Office', () => handlers.travel(LocationId.office));
+
+      this.camera.position.set(0, 1.65, 3.6);
+      return { yaw: 0, pitch: 0 };
+    }
+
+    // LocationId.lot14
+    this.currentSurface = 'concrete';
+    this.scene.fog.color.setHex(0x06080b);
+    this.setFlashlight(true);
+
+    this.addBox(12, 0.2, 12, 0, -0.1, 0, concFloor, false);
+    this.addBox(12, 0.2, 12, 0, 3.4, 0, this.ps1Mat(0x25221e), false);
+    this.buildWalls(12, 12, this.ps1Mat(0x4a3b2c));
+    this.scene.add(new THREE.AmbientLight(0x1c222c, 0.55));
+
+    const patch = this.addBox(2.4, 0.06, 2.0, 0, 0.03, -2.2, this.ps1Mat(0x757b84), false);
+    this.registerInteraction(patch, 'Inspect Fresh Concrete Floor Patch (Lot 14 Shed)', () => {
+      if (!game.state.finalExcavated) {
+        game.state.finalExcavated = true;
+        game.save();
+      }
+      handlers.inspect(EvidenceId.shedEvidence);
+    });
+
+    this.addBox(0.9, 1.1, 0.9, -3.6, 0.55, -3.2, this.ps1Mat(0x3a322d));
+    this.addBox(2.2, 1.2, 1.4, 3.5, 0.6, -3.4, this.ps1Mat(0x5c4228));
+
+    const gate = this.addBox(1.5, 2.3, 0.2, 0, 1.15, 5.7, this.ps1Mat(0x38434f));
+    this.registerInteraction(gate, 'Call Supt. Farahiyah & Close Case', () => {
+      if (!game.state.finalExcavated) {
+        handlers.toast('Examine the fresh concrete patch in the tool shed floor first.');
+        return;
+      }
+      handlers.triggerEnding();
+    });
+
+    this.camera.position.set(0, 1.65, 4.2);
+    return { yaw: 0, pitch: 0 };
+  }
+
+  render() {
+    this.renderer.render(this.scene, this.camera);
+  }
+}

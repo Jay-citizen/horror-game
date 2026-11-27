@@ -1,0 +1,266 @@
+import * as THREE from 'three';
+import { CUTSCENES, LocationId } from './data.js';
+import { SoundEngine } from './audio.js';
+import { GameController } from './game.js';
+import { WorldManager } from './world.js';
+import { UIManager } from './ui.js';
+import { runUnitTests } from '../tests/unit.test.js';
+
+const canvas = document.getElementById('ps1-canvas');
+const audio = new SoundEngine();
+const game = new GameController();
+const world = new WorldManager(canvas);
+
+const physics = {
+  yaw: 0,
+  pitch: 0,
+  vy: 0,
+  grounded: true,
+  crouching: false,
+  eyeHeight: 1.65,
+  hoveredInteraction: null
+};
+
+const keys = {};
+
+const ui = new UIManager(game, audio, {
+  requestPointerLock: () => {
+    if (document.pointerLockElement !== canvas) {
+      canvas.requestPointerLock?.();
+    }
+  },
+  travel: (locId) => travelTo(locId),
+  advanceNight: () => handleAdvanceNight()
+});
+
+function travelTo(locId) {
+  const orientation = world.buildLocation(locId, game, {
+    inspect: (evId) => ui.inspectEvidence(evId),
+    inspectSequence: (evIds) => ui.inspectEvidenceSequence(evIds, 0),
+    talk: (charId) => ui.openDialogue(charId),
+    openBoard: () => ui.openCaseBoard(),
+    openNotebook: (tab) => ui.openNotebook(tab),
+    travel: (nextLoc) => travelTo(nextLoc),
+    toast: (msg) => ui.showToast(msg),
+    triggerEnding: () => triggerFinalCutscenes()
+  });
+  physics.yaw = orientation.yaw;
+  physics.pitch = orientation.pitch;
+  physics.vy = 0;
+  physics.grounded = true;
+  ui.updateHUD();
+}
+
+function handleAdvanceNight() {
+  if (!game.canAdvanceNight()) {
+    ui.showToast('Leads incomplete for this night. Check the Hints tab in your Notebook.');
+    return;
+  }
+  ui.closeModal(false);
+  game.advanceNight();
+  ui.updateCheckpointButton();
+  ui.showToast(`Night ${game.state.night} Unlocked`);
+
+  if (game.state.night === 3) {
+    travelTo(LocationId.office);
+    ui.playCutscene(CUTSCENES.night3.tag, CUTSCENES.night3.slides, () => ui.updateHUD());
+  } else {
+    travelTo(LocationId.office);
+  }
+}
+
+function triggerFinalCutscenes() {
+  ui.playCutscene(CUTSCENES.finalReport.tag, CUTSCENES.finalReport.slides, () => {
+    ui.playCutscene(CUTSCENES.epilogue.tag, CUTSCENES.epilogue.slides, () => {
+      ui.wasInWorld = false;
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('title-screen').style.display = 'flex';
+    });
+  });
+}
+
+/* Input Wiring */
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (e.code === 'Tab') {
+    e.preventDefault();
+    if (!ui.isUIOpen && ui.wasInWorld) ui.openNotebook('evidence');
+  } else if (e.code === 'KeyR') {
+    if (!ui.isUIOpen && ui.wasInWorld) world.setFlashlight(!world.flashlightOn);
+  } else if (e.code === 'KeyC') {
+    if (!ui.isUIOpen && ui.wasInWorld) physics.crouching = !physics.crouching;
+  } else if (e.code === 'KeyE') {
+    if (!ui.isUIOpen && physics.hoveredInteraction) {
+      physics.hoveredInteraction.action();
+    }
+  } else if (e.code === 'Escape') {
+    ui.closeTopOverlay();
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+});
+
+canvas.addEventListener('click', () => {
+  if (ui.isUIOpen || !ui.wasInWorld) return;
+  if (physics.hoveredInteraction) {
+    physics.hoveredInteraction.action();
+    return;
+  }
+  if (document.pointerLockElement !== canvas) {
+    canvas.requestPointerLock?.();
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement === canvas && !ui.isUIOpen) {
+    physics.yaw -= e.movementX * 0.0024;
+    physics.pitch = Math.max(-1.2, Math.min(1.2, physics.pitch - e.movementY * 0.0024));
+  }
+});
+
+/* UI Button Bindings */
+document.getElementById('win-close').onclick = () => ui.closeModal(true);
+document.getElementById('btn-nb').onclick = () => ui.openNotebook('evidence');
+document.getElementById('btn-flash').onclick = () => world.setFlashlight(!world.flashlightOn);
+document.getElementById('btn-pause').onclick = () => ui.openPauseMenu();
+
+ui.updateCheckpointButton();
+
+document.getElementById('btn-start').onclick = () => {
+  audio.init();
+  game.reset();
+  document.getElementById('title-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  ui.wasInWorld = true;
+  travelTo(LocationId.office);
+  ui.playCutscene(CUTSCENES.night1.tag, CUTSCENES.night1.slides, () => {
+    game.save();
+    ui.updateCheckpointButton();
+    ui.showToast('Night 1 Checkpoint Saved');
+  });
+};
+
+document.getElementById('btn-load').onclick = () => {
+  audio.init();
+  if (game.load()) {
+    document.getElementById('title-screen').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    ui.wasInWorld = true;
+    travelTo(game.state.location);
+    ui.showToast(`Loaded Night ${game.state.night}`);
+  }
+};
+
+document.getElementById('btn-tests').onclick = () => {
+  const results = runUnitTests();
+  const passed = results.filter((r) => r.pass).length;
+  alert(`Diagnostic Unit Tests: ${passed}/${results.length} Passed.\n\n` +
+    results.map((r) => `${r.pass ? '[PASS]' : '[FAIL]'} ${r.name}`).join('\n'));
+};
+
+/* Fixed-Timestep Physics & Render Loop */
+const FIXED_DT = 1 / 60;
+const MIN_REACH = 0.25;
+const MAX_REACH = 3.6;
+const raycaster = new THREE.Raycaster();
+raycaster.near = MIN_REACH;
+raycaster.far = MAX_REACH;
+
+let accumulator = 0;
+let lastTime = performance.now();
+
+function stepPhysics(dt) {
+  if (ui.isUIOpen || !ui.wasInWorld) return;
+
+  const cam = world.camera;
+  cam.rotation.y = physics.yaw;
+  cam.rotation.x = physics.pitch;
+
+  const targetEye = physics.crouching ? 1.05 : 1.65;
+  physics.eyeHeight += (targetEye - physics.eyeHeight) * Math.min(1, dt * 12);
+
+  const speed = physics.crouching
+    ? 1.9
+    : (keys.ShiftLeft || keys.ShiftRight)
+      ? 5.2
+      : 3.2;
+
+  const forward = new THREE.Vector3(-Math.sin(physics.yaw), 0, -Math.cos(physics.yaw));
+  const right = new THREE.Vector3(Math.cos(physics.yaw), 0, -Math.sin(physics.yaw));
+  const move = new THREE.Vector3();
+
+  if (keys.KeyW || keys.ArrowUp) move.add(forward);
+  if (keys.KeyS || keys.ArrowDown) move.sub(forward);
+  if (keys.KeyD || keys.ArrowRight) move.add(right);
+  if (keys.KeyA || keys.ArrowLeft) move.sub(right);
+
+  if (move.lengthSq() > 0) {
+    move.normalize().multiplyScalar(speed * dt);
+    const nextX = cam.position.x + move.x;
+    const nextZ = cam.position.z + move.z;
+
+    const hitX = world.colliders.some(
+      (c) => nextX > c.minX && nextX < c.maxX && cam.position.z > c.minZ && cam.position.z < c.maxZ
+    );
+    const hitZ = world.colliders.some(
+      (c) => cam.position.x > c.minX && cam.position.x < c.maxX && nextZ > c.minZ && nextZ < c.maxZ
+    );
+
+    if (!hitX) cam.position.x = nextX;
+    if (!hitZ) cam.position.z = nextZ;
+
+    audio.stepTimer += dt * speed;
+    if (audio.stepTimer > 1.7) {
+      audio.stepTimer = 0;
+      audio.step(world.currentSurface);
+    }
+  }
+
+  if (keys.Space && physics.grounded && !physics.crouching) {
+    physics.vy = 4.6;
+    physics.grounded = false;
+  }
+
+  physics.vy -= 12.5 * dt;
+  cam.position.y += physics.vy * dt;
+
+  if (cam.position.y <= physics.eyeHeight) {
+    cam.position.y = physics.eyeHeight;
+    physics.vy = 0;
+    physics.grounded = true;
+  }
+
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), cam);
+  const hits = raycaster.intersectObjects(world.interactables, false);
+  const hitInteraction = hits.length > 0 ? hits[0].object.userData.interaction : null;
+  physics.hoveredInteraction = hitInteraction;
+
+  const ch = document.getElementById('crosshair');
+  const pr = document.getElementById('prompt');
+  if (hitInteraction) {
+    ch.classList.add('active');
+    pr.style.display = 'flex';
+    document.getElementById('prompt-txt').textContent = hitInteraction.label;
+  } else {
+    ch.classList.remove('active');
+    pr.style.display = 'none';
+  }
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const elapsed = Math.min(0.1, (now - lastTime) / 1000);
+  lastTime = now;
+  accumulator += elapsed;
+
+  while (accumulator >= FIXED_DT) {
+    stepPhysics(FIXED_DT);
+    accumulator -= FIXED_DT;
+  }
+
+  world.render();
+}
+
+requestAnimationFrame(frame);
